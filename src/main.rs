@@ -12,9 +12,12 @@ const WORLD_HEIGHT: usize = 200;
 const TILE_PIXEL: f32 = 8.0;
 
 const DEFAULT_CAMERA_VISIBLE_HEIGHT: f32 = 720.0;
-const MIN_CAMERA_VISIBLE_HEIGHT: f32 = 160.0;
-const CAMERA_SPEED: f32 = 500.0;
-const ZOOM_FACTOR: f32 = 0.90;
+const MIN_CAMERA_VISIBLE_HEIGHT: f32 = 120.0;
+
+const CAMERA_SPEED: f32 = 600.0;
+const CAMERA_SMOOTHING: f32 = 10.0;
+
+const ZOOM_FACTOR: f32 = 0.80;
 
 const WORLD_SEED: &str = "KevinHasPotential";
 
@@ -91,40 +94,56 @@ fn clamp_camera_position(camera_position: &mut Vec2, world: &World, visible_heig
         .clamp(half_height, world_height - half_height);
 }
 
-fn update_camera_zoom(visible_height: &mut f32, camera_position: &mut Vec2, world: &World) {
+fn update_zoom_target(target_visible_height: &mut f32, target_position: &mut Vec2, world: &World) {
     let (_, wheel_y) = mouse_wheel();
 
     if wheel_y == 0.0 {
         return;
     }
 
-    let (mouse_x, mouse_y) = mouse_position();
-    let mouse_screen = vec2(mouse_x, mouse_y);
+    let mouse_screen: Vec2 = mouse_position().into();
 
-    let camera_before = create_camera(*camera_position, *visible_height);
+    let camera_before = create_camera(*target_position, *target_visible_height);
 
     let mouse_world_before = camera_before.screen_to_world(mouse_screen);
 
-    *visible_height *= ZOOM_FACTOR.powf(wheel_y);
+    *target_visible_height *= ZOOM_FACTOR.powf(wheel_y);
 
-    clamp_camera_zoom(visible_height, world);
+    clamp_camera_zoom(target_visible_height, world);
 
-    let camera_after = create_camera(*camera_position, *visible_height);
+    let camera_after = create_camera(*target_position, *target_visible_height);
 
     let mouse_world_after = camera_after.screen_to_world(mouse_screen);
 
-    *camera_position += mouse_world_before - mouse_world_after;
+    *target_position += mouse_world_before - mouse_world_after;
+
+    clamp_camera_position(target_position, world, *target_visible_height);
 }
 
-fn update_keyboard_movement(camera_position: &mut Vec2, visible_height: f32) {
+fn smooth_camera(
+    camera_position: &mut Vec2,
+    camera_visible_height: &mut f32,
+    target_position: Vec2,
+    target_visible_height: f32,
+) {
+    let delta_time = get_frame_time().min(0.05);
+
+    let smoothing = 1.0 - (-CAMERA_SMOOTHING * delta_time).exp();
+
+    *camera_position = camera_position.lerp(target_position, smoothing);
+
+    *camera_visible_height += (target_visible_height - *camera_visible_height) * smoothing;
+}
+
+fn update_camera_target(target_position: &mut Vec2, target_visible_height: f32, world: &World) {
     let mut direction = Vec2::ZERO;
 
     if is_key_down(KeyCode::W) || is_key_down(KeyCode::Up) {
-        direction.y -= 1.0;
+        direction.y += 1.0;
     }
 
     if is_key_down(KeyCode::S) || is_key_down(KeyCode::Down) {
-        direction.y += 1.0;
+        direction.y -= 1.0;
     }
 
     if is_key_down(KeyCode::A) || is_key_down(KeyCode::Left) {
@@ -137,48 +156,14 @@ fn update_keyboard_movement(camera_position: &mut Vec2, visible_height: f32) {
 
     if direction.length_squared() > 0.0 {
         direction = direction.normalize();
+
+        let zoom_adjusted_speed =
+            CAMERA_SPEED * target_visible_height / DEFAULT_CAMERA_VISIBLE_HEIGHT;
+
+        *target_position += direction * zoom_adjusted_speed * get_frame_time();
     }
 
-    let zoom_adjusted_speed = CAMERA_SPEED * (visible_height / DEFAULT_CAMERA_VISIBLE_HEIGHT);
-
-    *camera_position += direction * zoom_adjusted_speed * get_frame_time();
-}
-
-fn update_mouse_drag(
-    camera_position: &mut Vec2,
-    visible_height: f32,
-    previous_mouse_position: &mut Option<Vec2>,
-) {
-    let (mouse_x, mouse_y) = mouse_position();
-    let current_mouse_position = vec2(mouse_x, mouse_y);
-
-    if is_mouse_button_pressed(MouseButton::Middle) {
-        *previous_mouse_position = Some(current_mouse_position);
-    }
-
-    if is_mouse_button_down(MouseButton::Middle) {
-        if let Some(previous_position) = *previous_mouse_position {
-            let mouse_delta = current_mouse_position - previous_position;
-
-            let aspect_ratio = screen_width() / screen_height();
-
-            let visible_width = visible_height * aspect_ratio;
-
-            let world_units_per_screen_x = visible_width / screen_width();
-
-            let world_units_per_screen_y = visible_height / screen_height();
-
-            camera_position.x -= mouse_delta.x * world_units_per_screen_x;
-
-            camera_position.y -= mouse_delta.y * world_units_per_screen_y;
-        }
-
-        *previous_mouse_position = Some(current_mouse_position);
-    }
-
-    if is_mouse_button_released(MouseButton::Middle) {
-        *previous_mouse_position = None;
-    }
+    clamp_camera_position(target_position, world, target_visible_height);
 }
 
 fn window_conf() -> Conf {
@@ -196,26 +181,35 @@ fn window_conf() -> Conf {
 async fn main() {
     let world = World::new_world(WORLD_WIDTH, WORLD_HEIGHT, WORLD_SEED);
 
-    let mut camera_position = vec2(
+    let world_center = vec2(
         world.width as f32 * TILE_PIXEL / 2.0,
         world.height as f32 * TILE_PIXEL / 2.0,
     );
 
-    let mut camera_visible_height = DEFAULT_CAMERA_VISIBLE_HEIGHT;
+    let mut camera_position = world_center;
+    let mut target_camera_position = world_center;
 
-    let mut previous_mouse_position: Option<Vec2> = None;
+    let mut camera_visible_height = DEFAULT_CAMERA_VISIBLE_HEIGHT;
+    let mut target_camera_visible_height = DEFAULT_CAMERA_VISIBLE_HEIGHT;
 
     loop {
-        clamp_camera_zoom(&mut camera_visible_height, &world);
+        update_zoom_target(
+            &mut target_camera_visible_height,
+            &mut target_camera_position,
+            &world,
+        );
 
-        update_camera_zoom(&mut camera_visible_height, &mut camera_position, &world);
+        update_camera_target(
+            &mut target_camera_position,
+            target_camera_visible_height,
+            &world,
+        );
 
-        update_keyboard_movement(&mut camera_position, camera_visible_height);
-
-        update_mouse_drag(
+        smooth_camera(
             &mut camera_position,
-            camera_visible_height,
-            &mut previous_mouse_position,
+            &mut camera_visible_height,
+            target_camera_position,
+            target_camera_visible_height,
         );
 
         clamp_camera_position(&mut camera_position, &world, camera_visible_height);
