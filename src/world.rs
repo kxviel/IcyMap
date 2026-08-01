@@ -1,14 +1,6 @@
 use noise::{NoiseFn, Perlin};
 
-const WORLD_WIDTH: usize = 120;
-const WORLD_HEIGHT: usize = 80;
-const TILE_PIXEL: f32 = 8.0;
-
-const WORLD_SEED: &str = "KevinHasPotential";
-
-// Smaller = larger continents.
-// Bigger = small terrain patches.
-const HEIGHT_NOISE_SCALE: f64 = 0.045;
+const HEIGHT_NOISE_SCALE: f64 = 0.015; // low fragmentation -> small value
 const MOISTURE_NOISE_SCALE: f64 = 0.070;
 
 #[derive(Clone, Copy)]
@@ -75,11 +67,11 @@ fn apply_island_shape(height_value: f32, x: usize, y: usize, width: usize, heigh
 }
 
 fn choose_biome(height: f32, moisture: f32) -> Biome {
-    if height < 0.38 {
+    if height < 0.34 {
         Biome::Ocean
     } else if height > 0.78 {
         Biome::Mountain
-    } else if moisture < 0.30 {
+    } else if moisture < 0.20 {
         Biome::Desert
     } else if moisture > 0.62 {
         Biome::Forest
