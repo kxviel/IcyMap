@@ -1,10 +1,12 @@
 mod camera;
+mod ui;
 mod world;
 
 use crate::camera::{
     ZoomLevel, clamp_camera_position, create_camera, smooth_camera, update_camera_target,
     update_zoom_target,
 };
+use crate::ui::draw_hud;
 use crate::world::{Biome, World};
 use macroquad::prelude::*;
 
@@ -343,6 +345,8 @@ async fn main() {
         draw_tree_layer(&world, &textures, camera_position, camera_visible_height);
 
         set_default_camera();
+
+        draw_hud(camera_visible_height, DEFAULT_CAMERA_VISIBLE_HEIGHT);
 
         next_frame().await;
     }
