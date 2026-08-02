@@ -2,13 +2,47 @@ use crate::{DEFAULT_CAMERA_VISIBLE_HEIGHT, MIN_CAMERA_VISIBLE_HEIGHT, TILE_PIXEL
 use macroquad::prelude::*;
 
 const CAMERA_SPEED: f32 = 600.0;
-const CAMERA_SMOOTHING: f32 = 10.0;
 
-const ZOOM_FACTOR: f32 = 0.80;
+const POSITION_SMOOTHING: f32 = 10.0;
+const ZOOM_IN_SMOOTHING: f32 = 16.0;
+const ZOOM_OUT_SMOOTHING: f32 = 24.0;
+
+#[derive(Clone, Copy, PartialEq)]
+pub enum ZoomLevel {
+    FullWorld,
+    Default,
+    Close,
+}
+
+fn screen_aspect_ratio() -> f32 {
+    screen_width() / screen_height().max(1.0)
+}
+
+fn world_pixel_size(world: &World) -> Vec2 {
+    vec2(
+        world.width as f32 * TILE_PIXEL,
+        world.height as f32 * TILE_PIXEL,
+    )
+}
+
+fn zoom_height(level: ZoomLevel, world: &World) -> f32 {
+    match level {
+        ZoomLevel::FullWorld => {
+            let world_size = world_pixel_size(world);
+            let aspect_ratio = screen_aspect_ratio();
+
+            // Show the complete world without stretching it.
+            world_size.y.max(world_size.x / aspect_ratio)
+        }
+
+        ZoomLevel::Default => DEFAULT_CAMERA_VISIBLE_HEIGHT,
+
+        ZoomLevel::Close => MIN_CAMERA_VISIBLE_HEIGHT,
+    }
+}
 
 pub fn create_camera(camera_position: Vec2, visible_height: f32) -> Camera2D {
-    let aspect_ratio = screen_width() / screen_height();
-    let visible_width = visible_height * aspect_ratio;
+    let visible_width = visible_height * screen_aspect_ratio();
 
     Camera2D::from_display_rect(Rect::new(
         camera_position.x - visible_width / 2.0,
@@ -18,43 +52,34 @@ pub fn create_camera(camera_position: Vec2, visible_height: f32) -> Camera2D {
     ))
 }
 
-fn get_maximum_visible_height(world: &World) -> f32 {
-    let aspect_ratio = screen_width() / screen_height();
-
-    let world_width = world.width as f32 * TILE_PIXEL;
-    let world_height = world.height as f32 * TILE_PIXEL;
-
-    world_height.min(world_width / aspect_ratio)
-}
-
-fn clamp_camera_zoom(visible_height: &mut f32, world: &World) {
-    let maximum_visible_height = get_maximum_visible_height(world);
-
-    let minimum_visible_height = MIN_CAMERA_VISIBLE_HEIGHT.min(maximum_visible_height);
-
-    *visible_height = (*visible_height).clamp(minimum_visible_height, maximum_visible_height);
-}
-
 pub fn clamp_camera_position(camera_position: &mut Vec2, world: &World, visible_height: f32) {
-    let aspect_ratio = screen_width() / screen_height();
-    let visible_width = visible_height * aspect_ratio;
+    let world_size = world_pixel_size(world);
 
-    let world_width = world.width as f32 * TILE_PIXEL;
-    let world_height = world.height as f32 * TILE_PIXEL;
+    let visible_width = visible_height * screen_aspect_ratio();
 
-    let half_width = visible_width / 2.0;
-    let half_height = visible_height / 2.0;
+    if visible_width >= world_size.x {
+        camera_position.x = world_size.x / 2.0;
+    } else {
+        let half_width = visible_width / 2.0;
 
-    camera_position.x = camera_position
-        .x
-        .clamp(half_width, world_width - half_width);
+        camera_position.x = camera_position
+            .x
+            .clamp(half_width, world_size.x - half_width);
+    }
 
-    camera_position.y = camera_position
-        .y
-        .clamp(half_height, world_height - half_height);
+    if visible_height >= world_size.y {
+        camera_position.y = world_size.y / 2.0;
+    } else {
+        let half_height = visible_height / 2.0;
+
+        camera_position.y = camera_position
+            .y
+            .clamp(half_height, world_size.y - half_height);
+    }
 }
 
 pub fn update_zoom_target(
+    zoom_level: &mut ZoomLevel,
     target_visible_height: &mut f32,
     target_position: &mut Vec2,
     world: &World,
@@ -71,15 +96,33 @@ pub fn update_zoom_target(
 
     let mouse_world_before = camera_before.screen_to_world(mouse_screen);
 
-    *target_visible_height *= ZOOM_FACTOR.powf(wheel_y);
+    *zoom_level = if wheel_y > 0.0 {
+        match *zoom_level {
+            ZoomLevel::FullWorld => ZoomLevel::Default,
+            ZoomLevel::Default => ZoomLevel::Close,
+            ZoomLevel::Close => ZoomLevel::Close,
+        }
+    } else {
+        match *zoom_level {
+            ZoomLevel::Close => ZoomLevel::Default,
+            ZoomLevel::Default => ZoomLevel::FullWorld,
+            ZoomLevel::FullWorld => ZoomLevel::FullWorld,
+        }
+    };
 
-    clamp_camera_zoom(target_visible_height, world);
+    *target_visible_height = zoom_height(*zoom_level, world);
 
-    let camera_after = create_camera(*target_position, *target_visible_height);
+    if *zoom_level == ZoomLevel::FullWorld {
+        let world_size = world_pixel_size(world);
 
-    let mouse_world_after = camera_after.screen_to_world(mouse_screen);
+        *target_position = world_size / 2.0;
+    } else {
+        let camera_after = create_camera(*target_position, *target_visible_height);
 
-    *target_position += mouse_world_before - mouse_world_after;
+        let mouse_world_after = camera_after.screen_to_world(mouse_screen);
+
+        *target_position += mouse_world_before - mouse_world_after;
+    }
 
     clamp_camera_position(target_position, world, *target_visible_height);
 }
@@ -92,22 +135,30 @@ pub fn smooth_camera(
 ) {
     let delta_time = get_frame_time().min(0.05);
 
-    let smoothing = 1.0 - (-CAMERA_SMOOTHING * delta_time).exp();
+    let position_factor = 1.0 - (-POSITION_SMOOTHING * delta_time).exp();
 
-    *camera_position = camera_position.lerp(target_position, smoothing);
+    let zoom_smoothing = if target_visible_height > *camera_visible_height {
+        ZOOM_OUT_SMOOTHING
+    } else {
+        ZOOM_IN_SMOOTHING
+    };
 
-    *camera_visible_height += (target_visible_height - *camera_visible_height) * smoothing;
+    let zoom_factor = 1.0 - (-zoom_smoothing * delta_time).exp();
+
+    *camera_position = camera_position.lerp(target_position, position_factor);
+
+    *camera_visible_height += (target_visible_height - *camera_visible_height) * zoom_factor;
 }
 
 pub fn update_camera_target(target_position: &mut Vec2, target_visible_height: f32, world: &World) {
     let mut direction = Vec2::ZERO;
 
     if is_key_down(KeyCode::W) || is_key_down(KeyCode::Up) {
-        direction.y += 1.0;
+        direction.y -= 1.0;
     }
 
     if is_key_down(KeyCode::S) || is_key_down(KeyCode::Down) {
-        direction.y -= 1.0;
+        direction.y += 1.0;
     }
 
     if is_key_down(KeyCode::A) || is_key_down(KeyCode::Left) {
