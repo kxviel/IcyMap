@@ -79,11 +79,18 @@ fn draw_ground_layer(
             let tile = world.get_world_tile(x, y);
 
             let world_x = x as f32 * TILE_PIXEL;
-
             let world_y = y as f32 * TILE_PIXEL;
 
+            let hash = tile_hash(x, y);
+
+            // Select one of the four land variants.
+            // The same tile always gets the same variant.
+            let land_index = ((hash >> 16) as usize) % textures.lands.len();
+
+            let land_texture = &textures.lands[land_index];
+
             let (texture, allow_vertical_flip) = match tile.biome {
-                Biome::Forest | Biome::Grassland => (&textures.land, true),
+                Biome::Forest | Biome::Grassland => (land_texture, true),
 
                 Biome::Desert => (&textures.desert, true),
 
