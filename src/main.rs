@@ -139,6 +139,35 @@ fn draw_ground_layer(world: &World, textures: &TerrainTextures) {
     }
 }
 
+fn forest_neighbor_count(world: &World, x: usize, y: usize) -> u32 {
+    let mut count = 0;
+
+    for offset_y in -1..=1 {
+        for offset_x in -1..=1 {
+            if offset_x == 0 && offset_y == 0 {
+                continue;
+            }
+
+            if is_forest_tile(world, x as isize + offset_x, y as isize + offset_y) {
+                count += 1;
+            }
+        }
+    }
+
+    count
+}
+
+fn is_forest_tile(world: &World, x: isize, y: isize) -> bool {
+    if x < 0 || y < 0 || x >= world.width as isize || y >= world.height as isize {
+        return false;
+    }
+
+    matches!(
+        world.get_world_tile(x as usize, y as usize).biome,
+        Biome::Forest
+    )
+}
+
 fn draw_tree_layer(world: &World, textures: &TerrainTextures) {
     for y in 0..world.height {
         for x in 0..world.width {
@@ -152,8 +181,15 @@ fn draw_tree_layer(world: &World, textures: &TerrainTextures) {
             let tree_index = ((hash >> 24) as usize) % textures.trees.len();
             let tree_texture = &textures.trees[tree_index];
 
-            // Draw a tree on approximately 70% of forest tiles.
-            if hash % 100 >= 70 {
+            let forest_neighbors = forest_neighbor_count(world, x, y);
+            let tree_density = match forest_neighbors {
+                0..=2 => 20,
+                3..=4 => 40,
+                5..=6 => 55,
+                _ => 65,
+            };
+
+            if hash % 100 >= tree_density {
                 continue;
             }
 
