@@ -7,11 +7,21 @@ const POSITION_SMOOTHING: f32 = 10.0;
 const ZOOM_IN_SMOOTHING: f32 = 16.0;
 const ZOOM_OUT_SMOOTHING: f32 = 24.0;
 
-#[derive(Clone, Copy, PartialEq)]
-pub enum ZoomLevel {
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum ZoomLevel {
     FullWorld,
     Default,
     Close,
+}
+
+impl ZoomLevel {
+    pub(crate) fn label(self) -> &'static str {
+        match self {
+            ZoomLevel::FullWorld => "WORLD",
+            ZoomLevel::Default => "REGION",
+            ZoomLevel::Close => "CLOSE",
+        }
+    }
 }
 
 fn screen_aspect_ratio() -> f32 {
@@ -31,7 +41,6 @@ fn zoom_height(level: ZoomLevel, world: &World) -> f32 {
             let world_size = world_pixel_size(world);
             let aspect_ratio = screen_aspect_ratio();
 
-            // Show the complete world without stretching it.
             world_size.y.max(world_size.x / aspect_ratio)
         }
 
@@ -41,7 +50,7 @@ fn zoom_height(level: ZoomLevel, world: &World) -> f32 {
     }
 }
 
-pub fn create_camera(camera_position: Vec2, visible_height: f32) -> Camera2D {
+pub(crate) fn create_camera(camera_position: Vec2, visible_height: f32) -> Camera2D {
     let visible_width = visible_height * screen_aspect_ratio();
 
     Camera2D::from_display_rect(Rect::new(
@@ -52,7 +61,11 @@ pub fn create_camera(camera_position: Vec2, visible_height: f32) -> Camera2D {
     ))
 }
 
-pub fn clamp_camera_position(camera_position: &mut Vec2, world: &World, visible_height: f32) {
+pub(crate) fn clamp_camera_position(
+    camera_position: &mut Vec2,
+    world: &World,
+    visible_height: f32,
+) {
     let world_size = world_pixel_size(world);
 
     let visible_width = visible_height * screen_aspect_ratio();
@@ -78,7 +91,7 @@ pub fn clamp_camera_position(camera_position: &mut Vec2, world: &World, visible_
     }
 }
 
-pub fn update_zoom_target(
+pub(crate) fn update_zoom_target(
     zoom_level: &mut ZoomLevel,
     target_visible_height: &mut f32,
     target_position: &mut Vec2,
@@ -113,9 +126,7 @@ pub fn update_zoom_target(
     *target_visible_height = zoom_height(*zoom_level, world);
 
     if *zoom_level == ZoomLevel::FullWorld {
-        let world_size = world_pixel_size(world);
-
-        *target_position = world_size / 2.0;
+        *target_position = world_pixel_size(world) / 2.0;
     } else {
         let camera_after = create_camera(*target_position, *target_visible_height);
 
@@ -127,7 +138,7 @@ pub fn update_zoom_target(
     clamp_camera_position(target_position, world, *target_visible_height);
 }
 
-pub fn smooth_camera(
+pub(crate) fn smooth_camera(
     camera_position: &mut Vec2,
     camera_visible_height: &mut f32,
     target_position: Vec2,
@@ -145,12 +156,16 @@ pub fn smooth_camera(
 
     let zoom_factor = 1.0 - (-zoom_smoothing * delta_time).exp();
 
-    *camera_position = camera_position.lerp(target_position, position_factor);
+    *camera_position = (*camera_position).lerp(target_position, position_factor);
 
     *camera_visible_height += (target_visible_height - *camera_visible_height) * zoom_factor;
 }
 
-pub fn update_camera_target(target_position: &mut Vec2, target_visible_height: f32, world: &World) {
+pub(crate) fn update_camera_target(
+    target_position: &mut Vec2,
+    target_visible_height: f32,
+    world: &World,
+) {
     let mut direction = Vec2::ZERO;
 
     if is_key_down(KeyCode::W) || is_key_down(KeyCode::Up) {
