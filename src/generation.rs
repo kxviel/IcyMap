@@ -66,19 +66,16 @@ fn apply_island_shape(height_value: f32, x: usize, y: usize, width: usize, heigh
 }
 
 fn choose_biome(height: f32, moisture: f32) -> Biome {
-    if height < 0.34 {
-        Biome::Ocean
-    } else if height > 0.78 {
-        Biome::Mountain
-    } else if moisture < 0.20 {
-        Biome::Desert
+    if height < 0.18 {
+        Biome::DeepWater
+    } else if height < 0.34 {
+        Biome::ShallowWater
     } else if moisture > 0.62 {
         Biome::Forest
     } else {
-        Biome::Grassland
+        Biome::Land
     }
 }
-
 fn seed_to_u32(seed: &str, salt: u32) -> u32 {
     let mut hash: u32 = 2_166_136_261;
 

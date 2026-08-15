@@ -1,14 +1,9 @@
-use crate::camera::ZoomLevel;
 use macroquad::prelude::*;
 
 const TOP_BAR_HEIGHT: f32 = 44.0;
 const SIDE_PADDING: f32 = 18.0;
 
-pub(crate) fn draw_hud(
-    zoom_level: ZoomLevel,
-    camera_visible_height: f32,
-    default_visible_height: f32,
-) {
+pub(crate) fn draw_hud() {
     let background = Color::new(0.04, 0.05, 0.06, 0.88);
 
     let border = Color::new(1.0, 1.0, 1.0, 0.12);
@@ -30,21 +25,7 @@ pub(crate) fn draw_hud(
 
     draw_text("ICYMAP", SIDE_PADDING, 29.0, 23.0, primary_text);
 
-    let view_text = format!("VIEW  {}", zoom_level.label());
-
-    let view_size = measure_text(&view_text, None, 17, 1.0);
-
-    draw_text(
-        &view_text,
-        screen_width() / 2.0 - view_size.width / 2.0,
-        28.0,
-        17.0,
-        secondary_text,
-    );
-
-    let zoom_percentage = default_visible_height / camera_visible_height * 100.0;
-
-    let status = format!("{:.0}%     FPS  {}", zoom_percentage, get_fps(),);
+    let status = format!("FPS  {}", get_fps());
 
     let status_size = measure_text(&status, None, 17, 1.0);
 
