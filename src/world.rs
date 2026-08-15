@@ -3,7 +3,6 @@ pub(crate) enum Biome {
     ShallowWater,
     DeepWater,
     Land,
-    Forest,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -26,8 +25,8 @@ pub(crate) struct Tile {
     pub(crate) height: f32,
     pub(crate) moisture: f32,
     pub(crate) biome: Biome,
-    // pub(crate) terrain: Option<Terrain>,
-    // pub(crate) flora: Option<Flora>,
+    pub(crate) terrain: Option<Terrain>,
+    pub(crate) flora: Option<Flora>,
 }
 
 pub(crate) struct World {
@@ -54,11 +53,6 @@ impl World {
     pub(crate) fn get_world_tile(&self, x: usize, y: usize) -> &Tile {
         let index = self.index(x, y);
         &self.tiles[index]
-    }
-
-    pub(crate) fn get_world_tile_mut(&mut self, x: usize, y: usize) -> &mut Tile {
-        let index = self.index(x, y);
-        &mut self.tiles[index]
     }
 
     fn index(&self, x: usize, y: usize) -> usize {

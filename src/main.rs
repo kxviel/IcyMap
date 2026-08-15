@@ -13,14 +13,14 @@ use macroquad::prelude::*;
 const WINDOW_WIDTH: i32 = 1280;
 const WINDOW_HEIGHT: i32 = 720;
 
-const WORLD_WIDTH: usize = 300;
-const WORLD_HEIGHT: usize = 200;
+const WORLD_WIDTH: usize = 80;
+const WORLD_HEIGHT: usize = 50;
 
 pub(crate) const TILE_PIXEL: f32 = 8.0;
 
 pub(crate) const DEFAULT_CAMERA_VISIBLE_HEIGHT: f32 = 720.0;
 
-const WORLD_SEED: &str = "KevinHasPotential";
+const WORLD_SEED: &str = "IcyMap2.0";
 
 fn window_conf() -> Conf {
     Conf {
@@ -29,7 +29,7 @@ fn window_conf() -> Conf {
         window_height: WINDOW_HEIGHT,
         window_resizable: false,
         fullscreen: false,
-        high_dpi: true,
+        high_dpi: false,
         ..Default::default()
     }
 }

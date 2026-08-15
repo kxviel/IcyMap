@@ -1,34 +1,43 @@
-use crate::world::{Biome, Tile, World};
+use crate::world::{Biome, Flora, Terrain, Tile, World};
 use noise::{NoiseFn, Perlin};
 
-const HEIGHT_NOISE_SCALE: f64 = 0.015;
-const MOISTURE_NOISE_SCALE: f64 = 0.070;
+const HEIGHT_NOISE_SCALE: f64 = 0.021; // very large shapes
+const MOISTURE_NOISE_SCALE: f64 = 0.035; // moisture-> medium regions
+const FLORA_DENSITY_SCALE: f64 = 0.045; // should vegetation exists
+const FLORA_TYPE_SCALE: f64 = 0.18; // what kind
 
 pub(crate) fn generate_world(width: usize, height: usize, seed: &str) -> World {
     let height_seed = seed_to_u32(seed, 100);
-
     let moisture_seed = seed_to_u32(seed, 200);
+    let flora_density_seed = seed_to_u32(seed, 300);
+    let flora_type_seed = seed_to_u32(seed, 400);
 
     let height_noise = Perlin::new(height_seed);
-
     let moisture_noise = Perlin::new(moisture_seed);
+    let flora_density_noise = Perlin::new(flora_density_seed);
+    let flora_type_noise = Perlin::new(flora_type_seed);
 
     let mut tiles = Vec::with_capacity(width * height);
 
     for y in 0..height {
         for x in 0..width {
             let raw_height = sample_noise(&height_noise, x, y, HEIGHT_NOISE_SCALE);
-
             let moisture = sample_noise(&moisture_noise, x, y, MOISTURE_NOISE_SCALE);
+            let flora_density = sample_noise(&flora_density_noise, x, y, FLORA_DENSITY_SCALE);
+            let flora_type = sample_noise(&flora_type_noise, x, y, FLORA_TYPE_SCALE);
 
             let shaped_height = apply_island_shape(raw_height, x, y, width, height);
 
-            let biome = choose_biome(shaped_height, moisture);
+            let biome = choose_biome(shaped_height);
+            let terrain = generate_terrain(biome, shaped_height, moisture);
+            let flora = generate_flora(terrain, moisture, flora_density, flora_type);
 
             tiles.push(Tile {
                 height: shaped_height,
                 moisture,
                 biome,
+                terrain,
+                flora,
             });
         }
     }
@@ -36,6 +45,69 @@ pub(crate) fn generate_world(width: usize, height: usize, seed: &str) -> World {
     World::from_tiles(width, height, tiles)
 }
 
+fn generate_terrain(biome: Biome, height: f32, moisture: f32) -> Option<Terrain> {
+    match biome {
+        Biome::DeepWater | Biome::ShallowWater => None,
+        Biome::Land => {
+            if height > 0.8 {
+                Some(Terrain::Rock)
+            } else if moisture > 0.35 {
+                Some(Terrain::Grass)
+            } else {
+                Some(Terrain::Soil)
+            }
+        }
+    }
+}
+
+fn generate_flora(
+    terrain: Option<Terrain>,
+    moisture: f32,
+    density: f32,
+    kind: f32,
+) -> Option<Flora> {
+    match terrain {
+        Some(Terrain::Grass) => {
+            // First decide whether anything grows here.
+            let threshold = if moisture > 0.7 {
+                0.52
+            } else if moisture > 0.5 {
+                0.58
+            } else {
+                0.65
+            };
+
+            if density < threshold {
+                return None;
+            }
+
+            // THEN independently decide what grows.
+            if kind > 0.65 {
+                Some(Flora::TallTree)
+            } else if kind > 0.55 {
+                Some(Flora::ShortTree)
+            } else if kind > 0.45 {
+                Some(Flora::Bush)
+            } else {
+                Some(Flora::Flower)
+            }
+        }
+
+        Some(Terrain::Soil) => {
+            if moisture > 0.4 && density > 0.68 {
+                if kind > 0.5 {
+                    Some(Flora::Bush)
+                } else {
+                    Some(Flora::Flower)
+                }
+            } else {
+                None
+            }
+        }
+
+        Some(Terrain::Rock) | None => None,
+    }
+}
 fn sample_noise(noise: &Perlin, x: usize, y: usize, scale: f64) -> f32 {
     let noise_x = x as f64 * scale;
     let noise_y = y as f64 * scale;
@@ -49,33 +121,30 @@ fn sample_noise(noise: &Perlin, x: usize, y: usize, scale: f64) -> f32 {
 
 fn apply_island_shape(height_value: f32, x: usize, y: usize, width: usize, height: usize) -> f32 {
     let center_x = width as f32 / 2.0;
-
     let center_y = height as f32 / 2.0;
 
     let distance_x = (x as f32 - center_x).abs() / center_x;
-
     let distance_y = (y as f32 - center_y).abs() / center_y;
 
     let distance_from_center = distance_x.max(distance_y);
 
     let island_factor = 1.0 - distance_from_center;
 
-    let shaped_height = height_value * 0.75 + island_factor * 0.25;
+    let shaped_height = height_value * 0.49 + island_factor * 0.49;
 
     shaped_height.clamp(0.0, 1.0)
 }
 
-fn choose_biome(height: f32, moisture: f32) -> Biome {
+fn choose_biome(height: f32) -> Biome {
     if height < 0.18 {
         Biome::DeepWater
     } else if height < 0.34 {
         Biome::ShallowWater
-    } else if moisture > 0.62 {
-        Biome::Forest
     } else {
         Biome::Land
     }
 }
+
 fn seed_to_u32(seed: &str, salt: u32) -> u32 {
     let mut hash: u32 = 2_166_136_261;
 

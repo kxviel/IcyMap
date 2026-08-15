@@ -69,11 +69,11 @@ pub(crate) fn update_camera_target(target_position: &mut Vec2, world: &World) {
     let mut direction = Vec2::ZERO;
 
     if is_key_down(KeyCode::W) || is_key_down(KeyCode::Up) {
-        direction.y -= 1.0;
+        direction.y += 1.0;
     }
 
     if is_key_down(KeyCode::S) || is_key_down(KeyCode::Down) {
-        direction.y += 1.0;
+        direction.y -= 1.0;
     }
 
     if is_key_down(KeyCode::A) || is_key_down(KeyCode::Left) {
