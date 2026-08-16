@@ -3,8 +3,46 @@ use noise::{NoiseFn, Perlin};
 
 const HEIGHT_NOISE_SCALE: f64 = 0.021; // very large shapes
 const MOISTURE_NOISE_SCALE: f64 = 0.014; // moisture-> medium regions
-const FLORA_DENSITY_SCALE: f64 = 0.045; // should vegetation exists
-const FLORA_TYPE_SCALE: f64 = 0.18; // what kind
+const FLORA_DENSITY_SCALE: f64 = 0.063; // should vegetation exists
+const FLORA_TYPE_SCALE: f64 = 0.14; // what kind
+
+fn sample_fbm(
+    noise: &Perlin,
+    x: usize,
+    y: usize,
+    base_scale: f64,
+    octaves: usize,
+    persistence: f64,
+    lacunarity: f64,
+) -> f32 {
+    debug_assert!(octaves > 0);
+    debug_assert!(persistence > 0.0);
+    debug_assert!(lacunarity > 0.0);
+
+    let mut total = 0.0;
+    let mut amplitude = 1.0;
+    let mut frequency = 1.0;
+
+    // We need to track the maximum possible value to normalize the result correctly
+    let mut max_value = 0.0;
+
+    for _ in 0..octaves {
+        let noise_x = x as f64 * base_scale * frequency;
+        let noise_y = y as f64 * base_scale * frequency;
+
+        // The noise.get function returns values roughly between -1.0 and 1.0
+        total += noise.get([noise_x, noise_y]) * amplitude;
+        max_value += amplitude;
+
+        amplitude *= persistence;
+        frequency *= lacunarity;
+    }
+
+    // Normalize the accumulated total back to a 0.0 - 1.0 range
+    let normalized = (total / max_value + 1.0) / 2.0;
+
+    normalized.clamp(0.0, 1.0) as f32
+}
 
 pub(crate) fn generate_world(width: usize, height: usize, seed: &str) -> World {
     let height_seed = seed_to_u32(seed, 100);
@@ -21,10 +59,11 @@ pub(crate) fn generate_world(width: usize, height: usize, seed: &str) -> World {
 
     for y in 0..height {
         for x in 0..width {
-            let raw_height = sample_noise(&height_noise, x, y, HEIGHT_NOISE_SCALE);
-            let moisture = sample_noise(&moisture_noise, x, y, MOISTURE_NOISE_SCALE);
-            let flora_density = sample_noise(&flora_density_noise, x, y, FLORA_DENSITY_SCALE);
-            let flora_type = sample_noise(&flora_type_noise, x, y, FLORA_TYPE_SCALE);
+            let raw_height = sample_fbm(&height_noise, x, y, HEIGHT_NOISE_SCALE, 5, 0.5, 2.0);
+            let moisture = sample_fbm(&moisture_noise, x, y, MOISTURE_NOISE_SCALE, 3, 0.5, 2.0);
+            let flora_density =
+                sample_fbm(&flora_density_noise, x, y, FLORA_DENSITY_SCALE, 3, 0.5, 2.0);
+            let flora_type = sample_fbm(&flora_type_noise, x, y, FLORA_TYPE_SCALE, 1, 0.5, 2.0);
 
             let shaped_height = apply_island_shape(raw_height, x, y, width, height);
 
@@ -50,9 +89,9 @@ fn generate_terrain(biome: Biome, height: f32, moisture: f32) -> Option<Terrain>
         Biome::DeepWater | Biome::ShallowWater => None,
 
         Biome::Land => {
-            if height > 0.56 {
+            if height > 0.58 {
                 Some(Terrain::Rock)
-            } else if moisture < 0.20 {
+            } else if moisture < 0.40 {
                 Some(Terrain::Soil)
             } else {
                 Some(Terrain::Grass)
@@ -69,27 +108,25 @@ fn generate_flora(
 ) -> Option<Flora> {
     match terrain {
         Some(Terrain::Grass) => {
-            // First decide whether anything grows here.
-            let threshold = if moisture > 0.7 {
-                0.62
-            } else if moisture > 0.5 {
-                0.67
+            let threshold = if moisture > 0.68 {
+                0.52
+            } else if moisture > 0.52 {
+                0.57
             } else {
-                0.72
+                0.62
             };
 
             if density < threshold {
                 return None;
             }
 
-            // THEN independently decide what grows.
             if kind > 0.68 {
                 Some(Flora::TallTree)
             } else if kind > 0.58 {
                 Some(Flora::ShortTree)
             } else if kind > 0.50 {
                 Some(Flora::Bush)
-            } else if kind > 0.46 {
+            } else if kind > 0.44 {
                 Some(Flora::Flower)
             } else {
                 None
@@ -97,11 +134,13 @@ fn generate_flora(
         }
 
         Some(Terrain::Soil) => {
-            if moisture > 0.4 && density > 0.68 {
-                if kind > 0.5 {
+            if moisture > 0.32 && density > 0.58 {
+                if kind > 0.62 {
                     Some(Flora::Bush)
-                } else {
+                } else if kind > 0.48 {
                     Some(Flora::Flower)
+                } else {
+                    None
                 }
             } else {
                 None
@@ -110,17 +149,6 @@ fn generate_flora(
 
         Some(Terrain::Rock) | None => None,
     }
-}
-
-fn sample_noise(noise: &Perlin, x: usize, y: usize, scale: f64) -> f32 {
-    let noise_x = x as f64 * scale;
-    let noise_y = y as f64 * scale;
-
-    let raw_value = noise.get([noise_x, noise_y]);
-
-    let normalized = (raw_value + 1.0) / 2.0;
-
-    normalized.clamp(0.0, 1.0) as f32
 }
 
 fn normalize_axis(position: usize, size: usize) -> f32 {
