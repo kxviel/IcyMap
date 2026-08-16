@@ -233,6 +233,15 @@ fn get_tile_color(tile: &Tile) -> Color {
                 lerp_color(dry, wet, wetness)
             }
 
+            Some(Terrain::Sand) => {
+                let elevation = ((tile.height - 0.34) / (0.38 - 0.34)).clamp(0.0, 1.0);
+
+                let wet_sand = Color::from_rgba(157, 143, 98, 255);
+                let dry_sand = Color::from_rgba(173, 157, 108, 255);
+
+                lerp_color(wet_sand, dry_sand, elevation)
+            }
+
             Some(Terrain::Soil) => {
                 let wetness = (tile.moisture / 0.40).clamp(0.0, 1.0);
 

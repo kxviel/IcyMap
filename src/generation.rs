@@ -5,6 +5,7 @@ const HEIGHT_NOISE_SCALE: f64 = 0.021; // very large shapes
 const MOISTURE_NOISE_SCALE: f64 = 0.014; // moisture-> medium regions
 const FLORA_DENSITY_SCALE: f64 = 0.063; // should vegetation exists
 const FLORA_TYPE_SCALE: f64 = 0.14; // what kind
+const TERRAIN_DETAIL_SCALE: f64 = 0.14; // slightly disturb terrain boundaries
 
 fn sample_fbm(
     noise: &Perlin,
@@ -45,15 +46,11 @@ fn sample_fbm(
 }
 
 pub(crate) fn generate_world(width: usize, height: usize, seed: &str) -> World {
-    let height_seed = seed_to_u32(seed, 100);
-    let moisture_seed = seed_to_u32(seed, 200);
-    let flora_density_seed = seed_to_u32(seed, 300);
-    let flora_type_seed = seed_to_u32(seed, 400);
-
-    let height_noise = Perlin::new(height_seed);
-    let moisture_noise = Perlin::new(moisture_seed);
-    let flora_density_noise = Perlin::new(flora_density_seed);
-    let flora_type_noise = Perlin::new(flora_type_seed);
+    let height_noise = Perlin::new(seed_to_u32(seed, 100));
+    let moisture_noise = Perlin::new(seed_to_u32(seed, 200));
+    let flora_density_noise = Perlin::new(seed_to_u32(seed, 300));
+    let flora_type_noise = Perlin::new(seed_to_u32(seed, 500));
+    let terrain_detail_noise = Perlin::new(seed_to_u32(seed, 400));
 
     let mut tiles = Vec::with_capacity(width * height);
 
@@ -64,11 +61,20 @@ pub(crate) fn generate_world(width: usize, height: usize, seed: &str) -> World {
             let flora_density =
                 sample_fbm(&flora_density_noise, x, y, FLORA_DENSITY_SCALE, 3, 0.5, 2.0);
             let flora_type = sample_fbm(&flora_type_noise, x, y, FLORA_TYPE_SCALE, 1, 0.5, 2.0);
+            let terrain_detail = sample_fbm(
+                &terrain_detail_noise,
+                x,
+                y,
+                TERRAIN_DETAIL_SCALE,
+                2,
+                0.5,
+                2.0,
+            );
 
             let shaped_height = apply_island_shape(raw_height, x, y, width, height);
 
             let biome = choose_biome(shaped_height);
-            let terrain = generate_terrain(biome, shaped_height, moisture);
+            let terrain = generate_terrain(biome, shaped_height, moisture, terrain_detail);
             let flora = generate_flora(terrain, moisture, flora_density, flora_type);
 
             tiles.push(Tile {
@@ -84,12 +90,16 @@ pub(crate) fn generate_world(width: usize, height: usize, seed: &str) -> World {
     World::from_tiles(width, height, tiles)
 }
 
-fn generate_terrain(biome: Biome, height: f32, moisture: f32) -> Option<Terrain> {
+fn generate_terrain(biome: Biome, height: f32, moisture: f32, detail: f32) -> Option<Terrain> {
     match biome {
         Biome::DeepWater | Biome::ShallowWater => None,
 
         Biome::Land => {
-            if height > 0.58 {
+            let rock_threshold = 0.58 + (detail - 0.5) * 0.08;
+
+            if height < 0.365 {
+                Some(Terrain::Sand)
+            } else if height > rock_threshold {
                 Some(Terrain::Rock)
             } else if moisture < 0.40 {
                 Some(Terrain::Soil)
@@ -147,7 +157,7 @@ fn generate_flora(
             }
         }
 
-        Some(Terrain::Rock) | None => None,
+        Some(Terrain::Sand) | Some(Terrain::Rock) | None => None,
     }
 }
 

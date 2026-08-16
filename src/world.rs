@@ -7,6 +7,7 @@ pub(crate) enum Biome {
 
 #[derive(Clone, Copy, Debug)]
 pub(crate) enum Terrain {
+    Sand,
     Soil,
     Grass,
     Rock,
