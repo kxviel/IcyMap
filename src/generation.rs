@@ -1,8 +1,8 @@
 use crate::world::{Biome, Flora, Terrain, Tile, World};
 use noise::{NoiseFn, Perlin};
 
-const HEIGHT_NOISE_SCALE: f64 = 0.021; // very large shapes
-const MOISTURE_NOISE_SCALE: f64 = 0.035; // moisture-> medium regions
+const HEIGHT_NOISE_SCALE: f64 = 0.035; // very large shapes
+const MOISTURE_NOISE_SCALE: f64 = 0.028; // moisture-> medium regions
 const FLORA_DENSITY_SCALE: f64 = 0.045; // should vegetation exists
 const FLORA_TYPE_SCALE: f64 = 0.18; // what kind
 
@@ -48,13 +48,14 @@ pub(crate) fn generate_world(width: usize, height: usize, seed: &str) -> World {
 fn generate_terrain(biome: Biome, height: f32, moisture: f32) -> Option<Terrain> {
     match biome {
         Biome::DeepWater | Biome::ShallowWater => None,
+
         Biome::Land => {
-            if height > 0.8 {
+            if height > 0.56 {
                 Some(Terrain::Rock)
-            } else if moisture > 0.35 {
-                Some(Terrain::Grass)
-            } else {
+            } else if moisture < 0.20 {
                 Some(Terrain::Soil)
+            } else {
+                Some(Terrain::Grass)
             }
         }
     }
@@ -70,11 +71,11 @@ fn generate_flora(
         Some(Terrain::Grass) => {
             // First decide whether anything grows here.
             let threshold = if moisture > 0.7 {
-                0.52
+                0.62
             } else if moisture > 0.5 {
-                0.58
+                0.67
             } else {
-                0.65
+                0.72
             };
 
             if density < threshold {
@@ -82,14 +83,16 @@ fn generate_flora(
             }
 
             // THEN independently decide what grows.
-            if kind > 0.65 {
+            if kind > 0.68 {
                 Some(Flora::TallTree)
-            } else if kind > 0.55 {
+            } else if kind > 0.58 {
                 Some(Flora::ShortTree)
-            } else if kind > 0.45 {
+            } else if kind > 0.50 {
                 Some(Flora::Bush)
-            } else {
+            } else if kind > 0.46 {
                 Some(Flora::Flower)
+            } else {
+                None
             }
         }
 
@@ -108,6 +111,7 @@ fn generate_flora(
         Some(Terrain::Rock) | None => None,
     }
 }
+
 fn sample_noise(noise: &Perlin, x: usize, y: usize, scale: f64) -> f32 {
     let noise_x = x as f64 * scale;
     let noise_y = y as f64 * scale;
@@ -123,14 +127,16 @@ fn apply_island_shape(height_value: f32, x: usize, y: usize, width: usize, heigh
     let center_x = width as f32 / 2.0;
     let center_y = height as f32 / 2.0;
 
-    let distance_x = (x as f32 - center_x).abs() / center_x;
-    let distance_y = (y as f32 - center_y).abs() / center_y;
+    let distance_x = (x as f32 - center_x) / center_x;
+    let distance_y = (y as f32 - center_y) / center_y;
 
-    let distance_from_center = distance_x.max(distance_y);
+    let distance = (distance_x * distance_x + distance_y * distance_y)
+        .sqrt()
+        .min(1.0);
 
-    let island_factor = 1.0 - distance_from_center;
+    let island_factor = 1.0 - distance;
 
-    let shaped_height = height_value * 0.49 + island_factor * 0.49;
+    let shaped_height = height_value * 0.60 + island_factor * 0.40 - 0.08;
 
     shaped_height.clamp(0.0, 1.0)
 }

@@ -78,7 +78,9 @@ fn draw_flora_layer(world: &World, camera_position: Vec2, camera_visible_height:
                 let world_x = x as f32 * TILE_PIXEL;
                 let world_y = y as f32 * TILE_PIXEL;
 
-                draw_flora(flora, world_x, world_y, TILE_PIXEL);
+                let jitter = flora_jitter(x, y, TILE_PIXEL);
+
+                draw_flora(flora, world_x + jitter.x, world_y + jitter.y, TILE_PIXEL);
             }
         }
     }
@@ -156,10 +158,30 @@ fn draw_flora(flora: Flora, x: f32, y: f32, tile_size: f32) {
     }
 }
 
+fn flora_jitter(x: usize, y: usize, tile_size: f32) -> Vec2 {
+    let hash_x = (x as u32)
+        .wrapping_mul(374761393)
+        .wrapping_add((y as u32).wrapping_mul(668265263));
+
+    let hash_y = (x as u32)
+        .wrapping_mul(1274126177)
+        .wrapping_add((y as u32).wrapping_mul(2246822519));
+
+    let normalized_x = (hash_x % 1000) as f32 / 1000.0;
+    let normalized_y = (hash_y % 1000) as f32 / 1000.0;
+
+    let max_offset = tile_size * 0.21;
+
+    vec2(
+        (normalized_x - 0.5) * 2.0 * max_offset,
+        (normalized_y - 0.5) * 2.0 * max_offset,
+    )
+}
+
 fn get_tile_color(tile: &Tile) -> Color {
     match tile.biome {
-        Biome::DeepWater => Color::from_rgba(35, 70, 85, 255),
-        Biome::ShallowWater => Color::from_rgba(55, 105, 115, 255),
+        Biome::DeepWater => Color::from_rgba(40, 78, 90, 255),
+        Biome::ShallowWater => Color::from_rgba(55, 100, 108, 255),
 
         Biome::Land => match tile.terrain {
             Some(Terrain::Grass) => Color::from_rgba(100, 125, 80, 255),

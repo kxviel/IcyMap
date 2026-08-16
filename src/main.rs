@@ -20,7 +20,7 @@ pub(crate) const TILE_PIXEL: f32 = 8.0;
 
 pub(crate) const DEFAULT_CAMERA_VISIBLE_HEIGHT: f32 = 720.0;
 
-const WORLD_SEED: &str = "IcyMap2.0";
+const WORLD_SEED: &str = "Kevin'sIcyMap";
 
 fn window_conf() -> Conf {
     Conf {
