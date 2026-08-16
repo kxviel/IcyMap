@@ -1,8 +1,8 @@
 use crate::world::{Biome, Flora, Terrain, Tile, World};
 use noise::{NoiseFn, Perlin};
 
-const HEIGHT_NOISE_SCALE: f64 = 0.035; // very large shapes
-const MOISTURE_NOISE_SCALE: f64 = 0.028; // moisture-> medium regions
+const HEIGHT_NOISE_SCALE: f64 = 0.021; // very large shapes
+const MOISTURE_NOISE_SCALE: f64 = 0.014; // moisture-> medium regions
 const FLORA_DENSITY_SCALE: f64 = 0.045; // should vegetation exists
 const FLORA_TYPE_SCALE: f64 = 0.18; // what kind
 
@@ -123,12 +123,17 @@ fn sample_noise(noise: &Perlin, x: usize, y: usize, scale: f64) -> f32 {
     normalized.clamp(0.0, 1.0) as f32
 }
 
-fn apply_island_shape(height_value: f32, x: usize, y: usize, width: usize, height: usize) -> f32 {
-    let center_x = width as f32 / 2.0;
-    let center_y = height as f32 / 2.0;
+fn normalize_axis(position: usize, size: usize) -> f32 {
+    if size <= 1 {
+        0.0
+    } else {
+        position as f32 / (size - 1) as f32 * 2.0 - 1.0
+    }
+}
 
-    let distance_x = (x as f32 - center_x) / center_x;
-    let distance_y = (y as f32 - center_y) / center_y;
+fn apply_island_shape(height_value: f32, x: usize, y: usize, width: usize, height: usize) -> f32 {
+    let distance_x = normalize_axis(x, width);
+    let distance_y = normalize_axis(y, height);
 
     let distance = (distance_x * distance_x + distance_y * distance_y)
         .sqrt()
