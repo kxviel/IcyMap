@@ -57,15 +57,13 @@ pub(crate) fn clamp_camera_position(
     }
 }
 
-pub(crate) fn smooth_camera(camera_position: &mut Vec2, target_position: Vec2) {
-    let delta_time = get_frame_time().min(0.05);
-
+pub(crate) fn smooth_camera(camera_position: &mut Vec2, target_position: Vec2, delta_time: f32) {
     let position_factor = 1.0 - (-POSITION_SMOOTHING * delta_time).exp();
 
     *camera_position = (*camera_position).lerp(target_position, position_factor);
 }
 
-pub(crate) fn update_camera_target(target_position: &mut Vec2, world: &World) {
+pub(crate) fn update_camera_target(target_position: &mut Vec2, world: &World, delta_time: f32) {
     let mut direction = Vec2::ZERO;
 
     if is_key_down(KeyCode::W) || is_key_down(KeyCode::Up) {
@@ -87,7 +85,7 @@ pub(crate) fn update_camera_target(target_position: &mut Vec2, world: &World) {
     if direction.length_squared() > 0.0 {
         direction = direction.normalize();
 
-        *target_position += direction * CAMERA_SPEED * get_frame_time();
+        *target_position += direction * CAMERA_SPEED * delta_time;
     }
 
     clamp_camera_position(target_position, world, crate::DEFAULT_CAMERA_VISIBLE_HEIGHT);

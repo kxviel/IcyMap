@@ -18,7 +18,7 @@ const WORLD_HEIGHT: usize = 50;
 
 pub(crate) const TILE_PIXEL: f32 = 8.0;
 
-pub(crate) const DEFAULT_CAMERA_VISIBLE_HEIGHT: f32 = 720.0;
+pub(crate) const DEFAULT_CAMERA_VISIBLE_HEIGHT: f32 = 350.0;
 
 const WORLD_SEED: &str = "Kevin'sIcyMap";
 
@@ -47,9 +47,11 @@ async fn main() {
     let mut target_camera_position = world_center;
 
     loop {
-        update_camera_target(&mut target_camera_position, &world);
+        let delta_time = get_frame_time().min(0.05);
 
-        smooth_camera(&mut camera_position, target_camera_position);
+        update_camera_target(&mut target_camera_position, &world, delta_time);
+
+        smooth_camera(&mut camera_position, target_camera_position, delta_time);
 
         clamp_camera_position(&mut camera_position, &world, DEFAULT_CAMERA_VISIBLE_HEIGHT);
 
