@@ -1,139 +1,162 @@
 use crate::world::{Biome, Flora, Terrain, Tile, World};
 use noise::{NoiseFn, Perlin};
 
-const HEIGHT_NOISE_SCALE: f64 = 0.021; // very large shapes
-const MOISTURE_NOISE_SCALE: f64 = 0.014; // moisture-> medium regions
-const FLORA_DENSITY_SCALE: f64 = 0.063; // should vegetation exists
-const FLORA_TYPE_SCALE: f64 = 0.14; // what kind
-const TERRAIN_DETAIL_SCALE: f64 = 0.14; // slightly disturb terrain boundaries
+const HEIGHT_NOISE_SCALE: f64 = 0.021; // large land shapes
+const MOISTURE_NOISE_SCALE: f64 = 0.014; // large moisture regions
+const FLORA_DENSITY_SCALE: f64 = 0.063; // where vegetation grows
+const FLORA_TYPE_SCALE: f64 = 0.14; // what vegetation grows
+const TERRAIN_DETAIL_SCALE: f64 = 0.14; // roughens terrain boundaries
 
-fn sample_fbm(
-    noise: &Perlin,
-    x: usize,
-    y: usize,
-    base_scale: f64,
-    octaves: usize,
-    persistence: f64,
-    lacunarity: f64,
-) -> f32 {
-    debug_assert!(octaves > 0);
-    debug_assert!(persistence > 0.0);
-    debug_assert!(lacunarity > 0.0);
+// ==================================================
+// Noise generators
+// ==================================================
 
-    let mut total = 0.0;
-    let mut amplitude = 1.0;
-    let mut frequency = 1.0;
-
-    // We need to track the maximum possible value to normalize the result correctly
-    let mut max_value = 0.0;
-
-    for _ in 0..octaves {
-        let noise_x = x as f64 * base_scale * frequency;
-        let noise_y = y as f64 * base_scale * frequency;
-
-        // The noise.get function returns values roughly between -1.0 and 1.0
-        total += noise.get([noise_x, noise_y]) * amplitude;
-        max_value += amplitude;
-
-        amplitude *= persistence;
-        frequency *= lacunarity;
-    }
-
-    // Normalize the accumulated total back to a 0.0 - 1.0 range
-    let normalized = (total / max_value + 1.0) / 2.0;
-
-    normalized.clamp(0.0, 1.0) as f32
+struct WorldNoise {
+    height: Perlin,
+    moisture: Perlin,
+    flora_density: Perlin,
+    flora_type: Perlin,
+    terrain_detail: Perlin,
 }
 
+impl WorldNoise {
+    fn new(seed: &str) -> Self {
+        Self {
+            height: Perlin::new(seed_to_u32(seed, 100)),
+            moisture: Perlin::new(seed_to_u32(seed, 200)),
+            flora_density: Perlin::new(seed_to_u32(seed, 300)),
+            flora_type: Perlin::new(seed_to_u32(seed, 400)),
+            terrain_detail: Perlin::new(seed_to_u32(seed, 500)),
+        }
+    }
+}
+
+// Flora is generated after terrain/beaches,
+// so these values are temporarily stored.
+struct FloraSample {
+    density: f32,
+    kind: f32,
+}
+
+// ==================================================
+// World generation
+// ==================================================
+
 pub(crate) fn generate_world(width: usize, height: usize, seed: &str) -> World {
-    // --------------------------------------------------
-    // Seeds
-    // --------------------------------------------------
+    let noise = WorldNoise::new(seed);
 
-    let height_seed = seed_to_u32(seed, 100);
-    let moisture_seed = seed_to_u32(seed, 200);
-    let flora_density_seed = seed_to_u32(seed, 300);
-    let flora_type_seed = seed_to_u32(seed, 400);
-    let terrain_detail_seed = seed_to_u32(seed, 500);
+    let (mut tiles, flora_samples) = generate_base_tiles(width, height, &noise);
 
-    // --------------------------------------------------
-    // Noise generators
-    // --------------------------------------------------
+    apply_beaches(&mut tiles, width, height);
+    apply_flora(&mut tiles, &flora_samples);
 
-    let height_noise = Perlin::new(height_seed);
-    let moisture_noise = Perlin::new(moisture_seed);
-    let flora_density_noise = Perlin::new(flora_density_seed);
-    let flora_type_noise = Perlin::new(flora_type_seed);
-    let terrain_detail_noise = Perlin::new(terrain_detail_seed);
+    World::from_tiles(width, height, tiles)
+}
 
-    // --------------------------------------------------
-    // Storage
-    // --------------------------------------------------
+// ==================================================
+// Base terrain generation
+// ==================================================
 
+fn generate_base_tiles(
+    width: usize,
+    height: usize,
+    noise: &WorldNoise,
+) -> (Vec<Tile>, Vec<FloraSample>) {
     let mut tiles = Vec::with_capacity(width * height);
-
-    // Flora is generated after beaches,
-    // so temporarily store these values.
-    let mut flora_densities = Vec::with_capacity(width * height);
-    let mut flora_types = Vec::with_capacity(width * height);
-
-    // ==================================================
-    // PASS 1
-    // Generate height, biome and base terrain
-    // ==================================================
+    let mut flora_samples = Vec::with_capacity(width * height);
 
     for y in 0..height {
         for x in 0..width {
-            let raw_height = sample_fbm(&height_noise, x, y, HEIGHT_NOISE_SCALE, 5, 0.5, 2.0);
+            let (tile, flora_sample) = generate_base_tile(x, y, width, height, noise);
 
-            let moisture = sample_fbm(&moisture_noise, x, y, MOISTURE_NOISE_SCALE, 3, 0.5, 2.0);
-
-            let flora_density =
-                sample_fbm(&flora_density_noise, x, y, FLORA_DENSITY_SCALE, 3, 0.5, 2.0);
-
-            let flora_type = sample_fbm(&flora_type_noise, x, y, FLORA_TYPE_SCALE, 1, 0.5, 2.0);
-
-            let terrain_detail = sample_fbm(
-                &terrain_detail_noise,
-                x,
-                y,
-                TERRAIN_DETAIL_SCALE,
-                2,
-                0.5,
-                2.0,
-            );
-
-            let shaped_height = apply_island_shape(raw_height, x, y, width, height);
-
-            let biome = choose_biome(shaped_height);
-
-            let terrain = generate_terrain(biome, shaped_height, moisture, terrain_detail);
-
-            // Flora comes later.
-            tiles.push(Tile {
-                height: shaped_height,
-                moisture,
-                biome,
-                terrain,
-                flora: None,
-            });
-
-            flora_densities.push(flora_density);
-            flora_types.push(flora_type);
+            tiles.push(tile);
+            flora_samples.push(flora_sample);
         }
     }
 
-    // ==================================================
-    // PASS 2
-    // Convert land touching shallow water into sand
-    // ==================================================
+    (tiles, flora_samples)
+}
 
+fn generate_base_tile(
+    x: usize,
+    y: usize,
+    width: usize,
+    height: usize,
+    noise: &WorldNoise,
+) -> (Tile, FloraSample) {
+    let raw_height = sample_fbm(&noise.height, x, y, HEIGHT_NOISE_SCALE, 5, 0.5, 2.0);
+
+    let moisture = sample_fbm(&noise.moisture, x, y, MOISTURE_NOISE_SCALE, 3, 0.5, 2.0);
+
+    let flora_density = sample_fbm(&noise.flora_density, x, y, FLORA_DENSITY_SCALE, 3, 0.5, 2.0);
+
+    let flora_type = sample_fbm(&noise.flora_type, x, y, FLORA_TYPE_SCALE, 1, 0.5, 2.0);
+
+    let terrain_detail = sample_fbm(
+        &noise.terrain_detail,
+        x,
+        y,
+        TERRAIN_DETAIL_SCALE,
+        2,
+        0.5,
+        2.0,
+    );
+
+    let shaped_height = apply_island_shape(raw_height, x, y, width, height);
+
+    let biome = choose_biome(shaped_height);
+
+    let terrain = generate_terrain(biome, shaped_height, moisture, terrain_detail);
+
+    let tile = Tile {
+        height: shaped_height,
+        moisture,
+        biome,
+        terrain,
+        flora: None,
+    };
+
+    let flora_sample = FloraSample {
+        density: flora_density,
+        kind: flora_type,
+    };
+
+    (tile, flora_sample)
+}
+
+// ==================================================
+// Terrain
+// ==================================================
+
+fn generate_terrain(biome: Biome, height: f32, moisture: f32, detail: f32) -> Option<Terrain> {
+    match biome {
+        Biome::DeepWater | Biome::ShallowWater => None,
+
+        Biome::Land => {
+            let rock_threshold = 0.58 + (detail - 0.5) * 0.08;
+
+            let soil_threshold = 0.40 + (detail - 0.5) * 0.06;
+
+            if height > rock_threshold {
+                Some(Terrain::Rock)
+            } else if moisture < soil_threshold {
+                Some(Terrain::Soil)
+            } else {
+                Some(Terrain::Grass)
+            }
+        }
+    }
+}
+
+// ==================================================
+// Beaches
+// ==================================================
+
+fn apply_beaches(tiles: &mut [Tile], width: usize, height: usize) {
     for y in 0..height {
         for x in 0..width {
             let index = y * width + x;
 
-            // Only grass/soil can become beach.
-            // Rock remains rock, allowing rocky coastlines.
             let can_be_beach = tiles[index].biome == Biome::Land
                 && matches!(
                     tiles[index].terrain,
@@ -144,38 +167,11 @@ pub(crate) fn generate_world(width: usize, height: usize, seed: &str) -> World {
                 continue;
             }
 
-            let touches_shallow_water = has_shallow_water_neighbor(&tiles, x, y, width, height);
-
-            if touches_shallow_water {
+            if has_shallow_water_neighbor(tiles, x, y, width, height) {
                 tiles[index].terrain = Some(Terrain::Sand);
             }
         }
     }
-
-    // ==================================================
-    // PASS 3
-    // Generate flora using the FINAL terrain
-    // ==================================================
-
-    for index in 0..tiles.len() {
-        let terrain = tiles[index].terrain;
-        let moisture = tiles[index].moisture;
-
-        let flora = generate_flora(
-            terrain,
-            moisture,
-            flora_densities[index],
-            flora_types[index],
-        );
-
-        tiles[index].flora = flora;
-    }
-
-    // --------------------------------------------------
-    // Finished world
-    // --------------------------------------------------
-
-    World::from_tiles(width, height, tiles)
 }
 
 fn has_shallow_water_neighbor(
@@ -187,7 +183,7 @@ fn has_shallow_water_neighbor(
 ) -> bool {
     for offset_y in -1..=1 {
         for offset_x in -1..=1 {
-            // Don't check the tile itself.
+            // Skip the tile itself.
             if offset_x == 0 && offset_y == 0 {
                 continue;
             }
@@ -215,24 +211,18 @@ fn has_shallow_water_neighbor(
     false
 }
 
-fn generate_terrain(biome: Biome, height: f32, moisture: f32, detail: f32) -> Option<Terrain> {
-    match biome {
-        Biome::DeepWater | Biome::ShallowWater => None,
+// ==================================================
+// Flora
+// ==================================================
 
-        Biome::Land => {
-            let rock_threshold = 0.58 + (detail - 0.5) * 0.08;
-            let soil_threshold = 0.40 + (detail - 0.5) * 0.06;
+fn apply_flora(tiles: &mut [Tile], flora_samples: &[FloraSample]) {
+    debug_assert_eq!(tiles.len(), flora_samples.len());
 
-            if height > rock_threshold {
-                Some(Terrain::Rock)
-            } else if moisture < soil_threshold {
-                Some(Terrain::Soil)
-            } else {
-                Some(Terrain::Grass)
-            }
-        }
+    for (tile, sample) in tiles.iter_mut().zip(flora_samples.iter()) {
+        tile.flora = generate_flora(tile.terrain, tile.moisture, sample.density, sample.kind);
     }
 }
+
 fn generate_flora(
     terrain: Option<Terrain>,
     moisture: f32,
@@ -284,6 +274,49 @@ fn generate_flora(
     }
 }
 
+// ==================================================
+// Noise
+// ==================================================
+
+fn sample_fbm(
+    noise: &Perlin,
+    x: usize,
+    y: usize,
+    base_scale: f64,
+    octaves: usize,
+    persistence: f64,
+    lacunarity: f64,
+) -> f32 {
+    debug_assert!(octaves > 0);
+    debug_assert!(persistence > 0.0);
+    debug_assert!(lacunarity > 0.0);
+
+    let mut total = 0.0;
+    let mut amplitude = 1.0;
+    let mut frequency = 1.0;
+    let mut max_value = 0.0;
+
+    for _ in 0..octaves {
+        let noise_x = x as f64 * base_scale * frequency;
+
+        let noise_y = y as f64 * base_scale * frequency;
+
+        total += noise.get([noise_x, noise_y]) * amplitude;
+        max_value += amplitude;
+
+        amplitude *= persistence;
+        frequency *= lacunarity;
+    }
+
+    let normalized = (total / max_value + 1.0) / 2.0;
+
+    normalized.clamp(0.0, 1.0) as f32
+}
+
+// ==================================================
+// Island shape
+// ==================================================
+
 fn normalize_axis(position: usize, size: usize) -> f32 {
     if size <= 1 {
         0.0
@@ -307,6 +340,10 @@ fn apply_island_shape(height_value: f32, x: usize, y: usize, width: usize, heigh
     shaped_height.clamp(0.0, 1.0)
 }
 
+// ==================================================
+// Biomes
+// ==================================================
+
 fn choose_biome(height: f32) -> Biome {
     if height < 0.18 {
         Biome::DeepWater
@@ -317,12 +354,15 @@ fn choose_biome(height: f32) -> Biome {
     }
 }
 
+// ==================================================
+// Seed hashing
+// ==================================================
+
 fn seed_to_u32(seed: &str, salt: u32) -> u32 {
     let mut hash: u32 = 2_166_136_261;
 
     for byte in seed.as_bytes() {
         hash ^= *byte as u32;
-
         hash = hash.wrapping_mul(16_777_619);
     }
 
