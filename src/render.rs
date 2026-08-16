@@ -4,9 +4,14 @@ use crate::{
 };
 use macroquad::prelude::*;
 
+type TileBounds = (usize, usize, usize, usize);
+
 pub(crate) fn draw_world(world: &World, camera_position: Vec2, camera_visible_height: f32) {
-    draw_ground_layer(world, camera_position, camera_visible_height);
-    draw_flora_layer(world, camera_position, camera_visible_height);
+    let ground_bounds = visible_tile_bounds(world, camera_position, camera_visible_height, 0);
+    let flora_bounds = expand_tile_bounds(ground_bounds, world, 1);
+
+    draw_ground_layer(world, ground_bounds);
+    draw_flora_layer(world, flora_bounds);
 }
 
 fn visible_tile_bounds(
@@ -44,9 +49,19 @@ fn visible_tile_bounds(
     (start_x, end_x, start_y, end_y)
 }
 
-fn draw_ground_layer(world: &World, camera_position: Vec2, camera_visible_height: f32) {
-    let (start_x, end_x, start_y, end_y) =
-        visible_tile_bounds(world, camera_position, camera_visible_height, 3);
+fn expand_tile_bounds(bounds: TileBounds, world: &World, padding: usize) -> TileBounds {
+    let (start_x, end_x, start_y, end_y) = bounds;
+
+    (
+        start_x.saturating_sub(padding),
+        (end_x + padding).min(world.width),
+        start_y.saturating_sub(padding),
+        (end_y + padding).min(world.height),
+    )
+}
+
+fn draw_ground_layer(world: &World, bounds: TileBounds) {
+    let (start_x, end_x, start_y, end_y) = bounds;
 
     for y in start_y..end_y {
         for x in start_x..end_x {
@@ -66,9 +81,8 @@ fn draw_ground_layer(world: &World, camera_position: Vec2, camera_visible_height
     }
 }
 
-fn draw_flora_layer(world: &World, camera_position: Vec2, camera_visible_height: f32) {
-    let (start_x, end_x, start_y, end_y) =
-        visible_tile_bounds(world, camera_position, camera_visible_height, 3);
+fn draw_flora_layer(world: &World, bounds: TileBounds) {
+    let (start_x, end_x, start_y, end_y) = bounds;
 
     for y in start_y..end_y {
         for x in start_x..end_x {
