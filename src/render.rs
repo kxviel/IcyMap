@@ -192,15 +192,65 @@ fn flora_jitter(x: usize, y: usize, tile_size: f32) -> Vec2 {
     )
 }
 
+fn lerp_color(a: Color, b: Color, t: f32) -> Color {
+    let t = t.clamp(0.0, 1.0);
+
+    Color::new(
+        a.r + (b.r - a.r) * t,
+        a.g + (b.g - a.g) * t,
+        a.b + (b.b - a.b) * t,
+        1.0,
+    )
+}
+
 fn get_tile_color(tile: &Tile) -> Color {
     match tile.biome {
-        Biome::DeepWater => Color::from_rgba(40, 78, 90, 255),
-        Biome::ShallowWater => Color::from_rgba(55, 100, 108, 255),
+        Biome::DeepWater => {
+            let depth = (tile.height / 0.18).clamp(0.0, 1.0);
+
+            let deep = Color::from_rgba(38, 74, 87, 255);
+            let less_deep = Color::from_rgba(42, 81, 93, 255);
+
+            lerp_color(deep, less_deep, depth)
+        }
+
+        Biome::ShallowWater => {
+            let shallow = ((tile.height - 0.18) / (0.34 - 0.18)).clamp(0.0, 1.0);
+
+            let deeper = Color::from_rgba(52, 94, 103, 255);
+            let coastal = Color::from_rgba(61, 105, 110, 255);
+
+            lerp_color(deeper, coastal, shallow)
+        }
 
         Biome::Land => match tile.terrain {
-            Some(Terrain::Grass) => Color::from_rgba(100, 125, 80, 255),
-            Some(Terrain::Soil) => Color::from_rgba(125, 105, 75, 255),
-            Some(Terrain::Rock) => Color::from_rgba(105, 105, 95, 255),
+            Some(Terrain::Grass) => {
+                let wetness = ((tile.moisture - 0.40) / 0.42).clamp(0.0, 1.0);
+
+                let dry = Color::from_rgba(105, 126, 80, 255);
+                let wet = Color::from_rgba(94, 120, 76, 255);
+
+                lerp_color(dry, wet, wetness)
+            }
+
+            Some(Terrain::Soil) => {
+                let wetness = (tile.moisture / 0.40).clamp(0.0, 1.0);
+
+                let dry = Color::from_rgba(130, 108, 76, 255);
+                let damp = Color::from_rgba(120, 101, 72, 255);
+
+                lerp_color(dry, damp, wetness)
+            }
+
+            Some(Terrain::Rock) => {
+                let elevation = ((tile.height - 0.58) / 0.10).clamp(0.0, 1.0);
+
+                let low = Color::from_rgba(102, 103, 96, 255);
+                let high = Color::from_rgba(113, 114, 106, 255);
+
+                lerp_color(low, high, elevation)
+            }
+
             None => Color::from_rgba(100, 125, 80, 255),
         },
     }
