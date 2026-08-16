@@ -90,3 +90,9 @@ pub(crate) fn update_camera_target(target_position: &mut Vec2, world: &World, de
 
     clamp_camera_position(target_position, world, crate::DEFAULT_CAMERA_VISIBLE_HEIGHT);
 }
+
+pub(crate) fn mouse_world_position(camera: &Camera2D) -> Vec2 {
+    let (mouse_x, mouse_y) = mouse_position();
+
+    camera.screen_to_world(vec2(mouse_x, mouse_y))
+}

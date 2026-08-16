@@ -4,7 +4,9 @@ mod render;
 mod ui;
 mod world;
 
-use crate::camera::{clamp_camera_position, create_camera, smooth_camera, update_camera_target};
+use crate::camera::{
+    clamp_camera_position, create_camera, mouse_world_position, smooth_camera, update_camera_target,
+};
 use crate::generation::generate_world;
 use crate::render::draw_world;
 use crate::ui::draw_hud;
@@ -57,6 +59,25 @@ async fn main() {
 
         let camera = create_camera(camera_position, DEFAULT_CAMERA_VISIBLE_HEIGHT);
 
+        let mouse_world = mouse_world_position(&camera);
+
+        let tile_x = (mouse_world.x / TILE_PIXEL).floor() as isize;
+        let tile_y = (mouse_world.y / TILE_PIXEL).floor() as isize;
+
+        let hovered_tile = if tile_x >= 0
+            && tile_y >= 0
+            && tile_x < world.width as isize
+            && tile_y < world.height as isize
+        {
+            Some((
+                tile_x as usize,
+                tile_y as usize,
+                world.get_world_tile(tile_x as usize, tile_y as usize),
+            ))
+        } else {
+            None
+        };
+
         clear_background(BLACK);
 
         set_camera(&camera);
@@ -65,7 +86,7 @@ async fn main() {
 
         set_default_camera();
 
-        draw_hud();
+        draw_hud(hovered_tile);
 
         next_frame().await;
     }
