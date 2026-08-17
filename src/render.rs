@@ -3,6 +3,7 @@ use crate::{
     organism::Organism,
     world::{Biome, Flora, Terrain, Tile, World},
 };
+
 use macroquad::prelude::*;
 
 type TileBounds = (usize, usize, usize, usize);
@@ -19,7 +20,7 @@ pub(crate) fn draw_organism(organism: &Organism) {
     let y = organism.position.y;
     let x = organism.position.x;
 
-    let pulse = 1.0 + (get_time() as f32 * 3.0).sin() * 0.05;
+    let pulse = 1.0 + (get_time() as f32 * 3.5).sin() * 0.07;
     let r = TILE_PIXEL * 0.35 * pulse;
 
     draw_circle(x, y, r * 1.15, Color::new(0.1, 0.4, 0.2, 1.0));
