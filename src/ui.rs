@@ -43,7 +43,7 @@ fn draw_top_bar() {
         border,
     );
 
-    draw_text("ICYMAP", SIDE_PADDING, 29.0, 23.0, primary_text);
+    draw_text("ICYLIFE", SIDE_PADDING, 29.0, 23.0, primary_text);
 
     let status = format!("FPS  {}", get_fps());
 

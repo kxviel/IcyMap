@@ -107,7 +107,7 @@ fn update_simulation(
 
 fn window_conf() -> Conf {
     Conf {
-        window_title: "IcyMap".to_string(),
+        window_title: "IcyLife".to_string(),
 
         window_width: WINDOW_WIDTH,
 
