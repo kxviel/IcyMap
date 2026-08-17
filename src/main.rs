@@ -1,5 +1,6 @@
 mod camera;
 mod generation;
+mod organism;
 mod render;
 mod ui;
 mod world;
@@ -8,7 +9,8 @@ use crate::camera::{
     clamp_camera_position, create_camera, mouse_world_position, smooth_camera, update_camera_target,
 };
 use crate::generation::generate_world;
-use crate::render::draw_world;
+use crate::organism::initialize_organism;
+use crate::render::{draw_organism, draw_world};
 use crate::ui::draw_hud;
 use macroquad::prelude::*;
 
@@ -39,6 +41,7 @@ fn window_conf() -> Conf {
 #[macroquad::main(window_conf)]
 async fn main() {
     let world = generate_world(WORLD_WIDTH, WORLD_HEIGHT, WORLD_SEED);
+    let mut organism = initialize_organism(&world);
 
     let world_center = vec2(
         world.width as f32 * TILE_PIXEL / 2.0,
@@ -50,6 +53,7 @@ async fn main() {
 
     loop {
         let delta_time = get_frame_time().min(0.05);
+        organism.life_living(delta_time);
 
         update_camera_target(&mut target_camera_position, &world, delta_time);
 
@@ -83,6 +87,10 @@ async fn main() {
         set_camera(&camera);
 
         draw_world(&world, camera_position, DEFAULT_CAMERA_VISIBLE_HEIGHT);
+
+        if organism.alive {
+            draw_organism(&organism);
+        }
 
         set_default_camera();
 
