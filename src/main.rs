@@ -47,18 +47,45 @@ fn update_simulation(
     resources: &mut Resources,
     organisms: &mut Vec<Organism>,
     next_organism_id: &mut u64,
+    feeding_start_index: &mut usize,
 ) {
     let delta_time = SIMULATION_STEP_SECONDS as f32;
 
     resources.regenerate(delta_time);
 
+    /*
+     * Every organism senses and moves against
+     * the same resource state for this tick.
+     */
+    for organism in organisms.iter_mut() {
+        organism.move_with_chemotaxis(world, resources, delta_time);
+    }
+
+    /*
+     * Rotate feeding priority each tick so the
+     * earliest organism does not always consume first.
+     */
+    let population_size = organisms.len();
+
+    if population_size > 0 {
+        let start_index = *feeding_start_index % population_size;
+
+        for offset in 0..population_size {
+            let index = (start_index + offset) % population_size;
+
+            organisms[index].feed(resources, delta_time);
+        }
+
+        *feeding_start_index = (start_index + 1) % population_size;
+    }
+
+    for organism in organisms.iter_mut() {
+        organism.life_living(delta_time);
+    }
+
     let mut newborns = Vec::new();
 
     for organism in organisms.iter_mut() {
-        organism.move_with_chemotaxis(world, resources, delta_time);
-        organism.feed(resources, delta_time);
-        organism.life_living(delta_time);
-
         if organism.can_divide() {
             let child = organism.divide(*next_organism_id, world);
 
@@ -70,6 +97,12 @@ fn update_simulation(
 
     organisms.extend(newborns);
     organisms.retain(|organism| organism.alive);
+
+    if organisms.is_empty() {
+        *feeding_start_index = 0;
+    } else {
+        *feeding_start_index %= organisms.len();
+    }
 }
 
 fn window_conf() -> Conf {
@@ -117,6 +150,8 @@ async fn main() {
 
     let mut next_organism_id: u64 = 2;
 
+    let mut feeding_start_index: usize = 0;
+
     let mut simulation_accumulator = 0.0_f64;
 
     /*
@@ -146,6 +181,7 @@ async fn main() {
                 &mut resources,
                 &mut organisms,
                 &mut next_organism_id,
+                &mut feeding_start_index,
             );
 
             simulation_accumulator -= SIMULATION_STEP_SECONDS;
