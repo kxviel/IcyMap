@@ -94,7 +94,15 @@ impl Organism {
             return;
         }
 
-        let requested = NUTRIENT_INTAKE_RATE * delta_time;
+        let missing_energy = (MAX_ENERGY - self.energy).max(0.0);
+
+        let nutrients_for_missing_energy = missing_energy / ENERGY_PER_NUTRIENT;
+
+        let requested = (NUTRIENT_INTAKE_RATE * delta_time).min(nutrients_for_missing_energy);
+
+        if requested <= 0.0 {
+            return;
+        }
 
         let consumed = resources.consume(self.position, requested);
 
