@@ -1,6 +1,5 @@
 use crate::{
     TILE_PIXEL,
-    organism::Organism,
     world::{Biome, Flora, Terrain, Tile, World},
 };
 
@@ -16,23 +15,6 @@ pub(crate) fn draw_world(world: &World, camera_position: Vec2, camera_visible_he
     draw_flora_layer(world, flora_bounds);
 }
 
-pub(crate) fn draw_organism(organism: &Organism) {
-    let y = organism.position.y;
-    let x = organism.position.x;
-
-    let pulse = 1.0 + (get_time() as f32 * 3.5).sin() * 0.07;
-    let r = TILE_PIXEL * 0.35 * pulse;
-
-    draw_circle(x, y, r * 1.15, Color::new(0.1, 0.4, 0.2, 1.0));
-    draw_circle(x, y, r, Color::new(0.2, 0.7, 0.3, 1.0));
-    draw_circle(
-        x - r * 0.15,
-        y - r * 0.15,
-        r * 0.35,
-        Color::new(0.4, 0.9, 0.5, 1.0),
-    );
-}
-
 fn visible_tile_bounds(
     world: &World,
     camera_position: Vec2,
@@ -44,13 +26,9 @@ fn visible_tile_bounds(
     let camera_visible_width = camera_visible_height * aspect_ratio;
 
     let left = camera_position.x - camera_visible_width / 2.0;
-
     let right = camera_position.x + camera_visible_width / 2.0;
-
     let top = camera_position.y - camera_visible_height / 2.0;
-
     let bottom = camera_position.y + camera_visible_height / 2.0;
-
     let padding = padding as isize;
 
     let start_x =

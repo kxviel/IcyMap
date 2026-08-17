@@ -3,7 +3,7 @@
 version = 4
 
 [[package]]
-name = "IcyLife"
+name = "IcyMaps"
 version = "0.1.1"
 dependencies = [
  "macroquad",

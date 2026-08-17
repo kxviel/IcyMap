@@ -1,52 +1,43 @@
 use crate::world::Tile;
 use macroquad::prelude::*;
+use macroquad::ui::{hash, root_ui};
 
-const TOP_BAR_HEIGHT: f32 = 44.0;
+const SIDEBAR_WIDTH: f32 = 200.0;
 const SIDE_PADDING: f32 = 18.0;
 
 const INSPECTOR_WIDTH: f32 = 210.0;
 const INSPECTOR_HEIGHT: f32 = 145.0;
 
-// ==================================================
-// HUD
-// ==================================================
-
 pub(crate) fn draw_hud(hovered_tile: Option<(usize, usize, &Tile)>) {
-    draw_top_bar();
+    draw_sidebar();
 
     if let Some((x, y, tile)) = hovered_tile {
         draw_tile_inspector(x, y, tile);
     }
 }
 
-// ==================================================
-// Top bar
-// ==================================================
-
-fn draw_top_bar() {
+fn draw_sidebar() {
     let background = Color::new(0.04, 0.05, 0.06, 0.88);
-
-    let border = Color::new(1.0, 1.0, 1.0, 0.12);
-
     let primary_text = Color::new(0.95, 0.96, 0.97, 1.0);
-
     let secondary_text = Color::new(0.68, 0.72, 0.76, 1.0);
 
-    draw_rectangle(0.0, 0.0, screen_width(), TOP_BAR_HEIGHT, background);
-
-    draw_line(
+    draw_rectangle(
+        screen_width() - SIDEBAR_WIDTH,
         0.0,
-        TOP_BAR_HEIGHT,
-        screen_width(),
-        TOP_BAR_HEIGHT,
-        1.0,
-        border,
+        SIDEBAR_WIDTH,
+        screen_height(),
+        background,
     );
 
-    draw_text("ICYLIFE", SIDE_PADDING, 29.0, 23.0, primary_text);
+    draw_text(
+        "ICYMAPS",
+        screen_width() - SIDEBAR_WIDTH + SIDE_PADDING,
+        29.0,
+        23.0,
+        primary_text,
+    );
 
-    let status = format!("FPS  {}", get_fps());
-
+    let status = format!("FPS {}", get_fps());
     let status_size = measure_text(&status, None, 17, 1.0);
 
     draw_text(
@@ -58,23 +49,15 @@ fn draw_top_bar() {
     );
 }
 
-// ==================================================
-// Tile inspector
-// ==================================================
-
 fn draw_tile_inspector(x: usize, y: usize, tile: &Tile) {
     let panel_x = 12.0;
-    let panel_y = TOP_BAR_HEIGHT + 12.0;
+    let panel_y = 44.0 + 12.0;
 
     let background = Color::new(0.04, 0.05, 0.06, 0.90);
-
     let border = Color::new(1.0, 1.0, 1.0, 0.12);
-
     let primary_text = Color::new(0.95, 0.96, 0.97, 1.0);
-
     let secondary_text = Color::new(0.72, 0.75, 0.78, 1.0);
 
-    // Panel background
     draw_rectangle(
         panel_x,
         panel_y,
@@ -83,7 +66,6 @@ fn draw_tile_inspector(x: usize, y: usize, tile: &Tile) {
         background,
     );
 
-    // Border
     draw_rectangle_lines(
         panel_x,
         panel_y,
@@ -93,7 +75,6 @@ fn draw_tile_inspector(x: usize, y: usize, tile: &Tile) {
         border,
     );
 
-    // Title
     draw_text("TILE", panel_x + 12.0, panel_y + 22.0, 18.0, primary_text);
 
     let terrain_text = match tile.terrain {
