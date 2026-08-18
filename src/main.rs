@@ -21,7 +21,11 @@ const WORLD_WIDTH: usize = 240;
 const WORLD_HEIGHT: usize = 150;
 
 pub(crate) const TILE_PIXEL: f32 = 8.0;
-pub(crate) const DEFAULT_CAMERA_VISIBLE_HEIGHT: f32 = 630.0;
+
+const ZOOM_STEP: f32 = 50.0;
+const MIN_CAMERA_VISIBLE_HEIGHT: f32 = 180.0;
+const MAX_CAMERA_VISIBLE_HEIGHT: f32 = 1200.0;
+const DEFAULT_CAMERA_VISIBLE_HEIGHT: f32 = 630.0;
 
 const MAX_CAMERA_DELTA_SECONDS: f32 = 0.05;
 
@@ -69,15 +73,31 @@ async fn main() {
     );
 
     let mut camera_position = world_center;
-
     let mut target_camera_position = world_center;
+
+    let mut camera_visible_height = DEFAULT_CAMERA_VISIBLE_HEIGHT;
 
     loop {
         // Camera
 
         let camera_delta_time = get_frame_time().min(MAX_CAMERA_DELTA_SECONDS);
 
-        update_camera_target(&mut target_camera_position, &world, camera_delta_time);
+        let (_, wheel_y) = mouse_wheel();
+
+        if wheel_y > 0.0 {
+            camera_visible_height = (camera_visible_height - ZOOM_STEP)
+                .clamp(MIN_CAMERA_VISIBLE_HEIGHT, MAX_CAMERA_VISIBLE_HEIGHT);
+        } else if wheel_y < 0.0 {
+            camera_visible_height = (camera_visible_height + ZOOM_STEP)
+                .clamp(MIN_CAMERA_VISIBLE_HEIGHT, MAX_CAMERA_VISIBLE_HEIGHT);
+        }
+
+        update_camera_target(
+            &mut target_camera_position,
+            &world,
+            camera_delta_time,
+            camera_visible_height,
+        );
 
         smooth_camera(
             &mut camera_position,
@@ -85,15 +105,16 @@ async fn main() {
             camera_delta_time,
         );
 
-        clamp_camera_position(&mut camera_position, &world, DEFAULT_CAMERA_VISIBLE_HEIGHT);
+        clamp_camera_position(&mut camera_position, &world, camera_visible_height);
 
-        let camera = create_camera(camera_position, DEFAULT_CAMERA_VISIBLE_HEIGHT);
+        let camera = create_camera(camera_position, camera_visible_height);
 
         // Tile Inspector
 
         let mouse_world = mouse_world_position(&camera);
 
         let tile_x = (mouse_world.x / TILE_PIXEL).floor() as isize;
+
         let tile_y = (mouse_world.y / TILE_PIXEL).floor() as isize;
 
         let hovered_tile = if !mouse_is_over_sidebar()
@@ -117,7 +138,7 @@ async fn main() {
 
         set_camera(&camera);
 
-        draw_world(&world, camera_position, DEFAULT_CAMERA_VISIBLE_HEIGHT);
+        draw_world(&world, camera_position, camera_visible_height);
 
         set_default_camera();
 

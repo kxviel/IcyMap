@@ -2,7 +2,6 @@ use crate::{TILE_PIXEL, ui::SIDEBAR_WIDTH, world::World};
 use macroquad::prelude::*;
 
 const CAMERA_SPEED: f32 = 600.0;
-
 const POSITION_SMOOTHING: f32 = 10.0;
 
 fn map_viewport_width() -> f32 {
@@ -76,7 +75,12 @@ pub(crate) fn smooth_camera(camera_position: &mut Vec2, target_position: Vec2, d
     *camera_position = (*camera_position).lerp(target_position, position_factor);
 }
 
-pub(crate) fn update_camera_target(target_position: &mut Vec2, world: &World, delta_time: f32) {
+pub(crate) fn update_camera_target(
+    target_position: &mut Vec2,
+    world: &World,
+    delta_time: f32,
+    visible_height: f32,
+) {
     let mut direction = Vec2::ZERO;
 
     if is_key_down(KeyCode::W) || is_key_down(KeyCode::Up) {
@@ -97,11 +101,10 @@ pub(crate) fn update_camera_target(target_position: &mut Vec2, world: &World, de
 
     if direction.length_squared() > 0.0 {
         direction = direction.normalize();
-
         *target_position += direction * CAMERA_SPEED * delta_time;
     }
 
-    clamp_camera_position(target_position, world, crate::DEFAULT_CAMERA_VISIBLE_HEIGHT);
+    clamp_camera_position(target_position, world, visible_height);
 }
 
 pub(crate) fn mouse_world_position(camera: &Camera2D) -> Vec2 {
