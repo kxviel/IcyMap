@@ -48,7 +48,7 @@ fn window_conf() -> Conf {
         window_title: "IcyMaps".to_string(),
         window_width: WINDOW_WIDTH,
         window_height: WINDOW_HEIGHT,
-        window_resizable: false,
+        window_resizable: true,
         fullscreen: false,
         high_dpi: false,
         icon: load_icon("assets/icymaps_icon_1024.png"),
