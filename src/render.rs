@@ -1,6 +1,7 @@
 use crate::{
     TILE_PIXEL,
     camera::map_viewport_aspect_ratio,
+    generation::{DEEP_WATER_MAX_HEIGHT, SHALLOW_WATER_MAX_HEIGHT},
     world::{Biome, Flora, Terrain, Tile, World},
 };
 
@@ -202,7 +203,7 @@ fn lerp_color(a: Color, b: Color, t: f32) -> Color {
 fn get_tile_color(tile: &Tile) -> Color {
     match tile.biome {
         Biome::DeepWater => {
-            let depth = (tile.height / 0.18).clamp(0.0, 1.0);
+            let depth = (tile.height / DEEP_WATER_MAX_HEIGHT).clamp(0.0, 1.0);
 
             let deep = Color::from_rgba(38, 74, 87, 255);
             let less_deep = Color::from_rgba(42, 81, 93, 255);
@@ -211,7 +212,8 @@ fn get_tile_color(tile: &Tile) -> Color {
         }
 
         Biome::ShallowWater => {
-            let shallow = ((tile.height - 0.18) / (0.34 - 0.18)).clamp(0.0, 1.0);
+            let shallow = (tile.height - DEEP_WATER_MAX_HEIGHT)
+                / (SHALLOW_WATER_MAX_HEIGHT - DEEP_WATER_MAX_HEIGHT);
 
             let deeper = Color::from_rgba(52, 94, 103, 255);
             let coastal = Color::from_rgba(61, 105, 110, 255);
@@ -248,7 +250,9 @@ fn get_tile_color(tile: &Tile) -> Color {
             }
 
             Some(Terrain::Rock) => {
-                let elevation = ((tile.height - 0.58) / 0.10).clamp(0.0, 1.0);
+                let elevation = ((tile.height - SHALLOW_WATER_MAX_HEIGHT)
+                    / (0.38 - SHALLOW_WATER_MAX_HEIGHT))
+                    .clamp(0.0, 1.0);
 
                 let low = Color::from_rgba(102, 103, 96, 255);
                 let high = Color::from_rgba(113, 114, 106, 255);

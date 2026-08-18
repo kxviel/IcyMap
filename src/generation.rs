@@ -3,6 +3,15 @@ use crate::{
     world::{Biome, Flora, Terrain, Tile, World},
 };
 
+pub(crate) const DEEP_WATER_MAX_HEIGHT: f32 = 0.18;
+pub(crate) const SHALLOW_WATER_MAX_HEIGHT: f32 = 0.34;
+
+pub(crate) const ROCK_BASE_HEIGHT: f32 = 0.58;
+pub(crate) const ROCK_DETAIL_RANGE: f32 = 0.08;
+
+pub(crate) const SOIL_BASE_HEIGHT: f32 = 0.40;
+pub(crate) const SOIL_DETAIL_RANGE: f32 = 0.06;
+
 struct FloraSample {
     density: f32,
     kind: f32,
@@ -144,9 +153,8 @@ fn generate_terrain(biome: Biome, height: f32, moisture: f32, detail: f32) -> Op
         Biome::DeepWater | Biome::ShallowWater => None,
 
         Biome::Land => {
-            let rock_threshold = 0.58 + (detail - 0.5) * 0.08;
-
-            let soil_threshold = 0.40 + (detail - 0.5) * 0.06;
+            let rock_threshold = ROCK_BASE_HEIGHT + (detail - 0.5) * ROCK_DETAIL_RANGE;
+            let soil_threshold = SOIL_BASE_HEIGHT + (detail - 0.5) * SOIL_DETAIL_RANGE;
 
             if height > rock_threshold {
                 Some(Terrain::Rock)
@@ -301,9 +309,9 @@ fn apply_island_shape(height_value: f32, x: usize, y: usize, width: usize, heigh
 }
 
 fn choose_biome(height: f32) -> Biome {
-    if height < 0.18 {
+    if height < DEEP_WATER_MAX_HEIGHT {
         Biome::DeepWater
-    } else if height < 0.34 {
+    } else if height < SHALLOW_WATER_MAX_HEIGHT {
         Biome::ShallowWater
     } else {
         Biome::Land
