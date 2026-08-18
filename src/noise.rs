@@ -8,6 +8,14 @@ pub(crate) struct WorldNoise {
     pub(crate) terrain_detail: Perlin,
 }
 
+pub(crate) struct NoiseScales {
+    pub(crate) height: f32,
+    pub(crate) moisture: f32,
+    pub(crate) flora_density: f32,
+    pub(crate) flora_type: f32,
+    pub(crate) terrain_detail: f32,
+}
+
 pub(crate) fn fbm_gen(
     noise: &Perlin,
     x: usize,

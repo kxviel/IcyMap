@@ -9,6 +9,7 @@ use crate::camera::{
     clamp_camera_position, create_camera, mouse_world_position, smooth_camera, update_camera_target,
 };
 use crate::generation::generate_world;
+use crate::noise::NoiseScales;
 use crate::render::draw_world;
 use crate::ui::{MapControls, draw_controls, draw_hud, mouse_is_over_sidebar};
 use macroquad::prelude::*;
@@ -58,16 +59,9 @@ fn window_conf() -> Conf {
 #[macroquad::main(window_conf)]
 async fn main() {
     let mut controls = MapControls::new();
-    let mut world = generate_world(
-        WORLD_WIDTH,
-        WORLD_HEIGHT,
-        &controls.seed,
-        controls.height_scale,
-        controls.moisture_scale,
-        controls.flora_density_scale,
-        controls.flora_type_scale,
-        controls.terrain_detail_scale,
-    );
+    let scales = controls.noise_scales();
+
+    let mut world = generate_world(WORLD_WIDTH, WORLD_HEIGHT, &controls.seed, &scales);
 
     let world_center = vec2(
         world.width as f32 * TILE_PIXEL / 2.0,
@@ -130,17 +124,17 @@ async fn main() {
         draw_hud(hovered_tile);
 
         let regenerate = draw_controls(&mut controls);
+
         if regenerate {
-            world = generate_world(
-                WORLD_WIDTH,
-                WORLD_HEIGHT,
-                &controls.seed,
-                controls.height_scale,
-                controls.moisture_scale,
-                controls.flora_density_scale,
-                controls.flora_type_scale,
-                controls.terrain_detail_scale,
-            );
+            let scales = NoiseScales {
+                height: controls.height_scale,
+                moisture: controls.moisture_scale,
+                flora_density: controls.flora_density_scale,
+                flora_type: controls.flora_type_scale,
+                terrain_detail: controls.terrain_detail_scale,
+            };
+
+            world = generate_world(WORLD_WIDTH, WORLD_HEIGHT, &controls.seed, &scales);
         }
 
         next_frame().await;

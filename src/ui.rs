@@ -1,3 +1,4 @@
+use crate::noise::NoiseScales;
 use crate::world::Tile;
 use macroquad::prelude::*;
 use macroquad::ui::{Id, Skin, Ui, hash, root_ui, widgets};
@@ -49,6 +50,16 @@ impl MapControls {
             flora_type_scale_input: String::from("0.140"),
             terrain_detail_scale_input: String::from("0.140"),
             skin: controls_skin(),
+        }
+    }
+
+    pub(crate) fn noise_scales(&self) -> NoiseScales {
+        NoiseScales {
+            height: self.height_scale,
+            moisture: self.moisture_scale,
+            flora_density: self.flora_density_scale,
+            flora_type: self.flora_type_scale,
+            terrain_detail: self.terrain_detail_scale,
         }
     }
 
