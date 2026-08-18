@@ -1,12 +1,16 @@
-use crate::{TILE_PIXEL, world::World};
+use crate::{TILE_PIXEL, ui::SIDEBAR_WIDTH, world::World};
 use macroquad::prelude::*;
 
 const CAMERA_SPEED: f32 = 600.0;
 
 const POSITION_SMOOTHING: f32 = 10.0;
 
-fn screen_aspect_ratio() -> f32 {
-    screen_width() / screen_height().max(1.0)
+fn map_viewport_width() -> f32 {
+    (screen_width() - SIDEBAR_WIDTH).max(1.0)
+}
+
+pub(crate) fn map_viewport_aspect_ratio() -> f32 {
+    map_viewport_width() / screen_height().max(1.0)
 }
 
 fn world_pixel_size(world: &World) -> Vec2 {
@@ -17,14 +21,23 @@ fn world_pixel_size(world: &World) -> Vec2 {
 }
 
 pub(crate) fn create_camera(camera_position: Vec2, visible_height: f32) -> Camera2D {
-    let visible_width = visible_height * screen_aspect_ratio();
+    let visible_width = visible_height * map_viewport_aspect_ratio();
 
-    Camera2D::from_display_rect(Rect::new(
+    let mut camera = Camera2D::from_display_rect(Rect::new(
         camera_position.x - visible_width / 2.0,
         camera_position.y - visible_height / 2.0,
         visible_width,
         visible_height,
-    ))
+    ));
+
+    camera.viewport = Some((
+        0,
+        0,
+        map_viewport_width().round() as i32,
+        screen_height().max(1.0).round() as i32,
+    ));
+
+    camera
 }
 
 pub(crate) fn clamp_camera_position(
@@ -34,7 +47,7 @@ pub(crate) fn clamp_camera_position(
 ) {
     let world_size = world_pixel_size(world);
 
-    let visible_width = visible_height * screen_aspect_ratio();
+    let visible_width = visible_height * map_viewport_aspect_ratio();
 
     if visible_width >= world_size.x {
         camera_position.x = world_size.x / 2.0;

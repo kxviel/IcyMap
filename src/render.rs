@@ -1,5 +1,6 @@
 use crate::{
     TILE_PIXEL,
+    camera::map_viewport_aspect_ratio,
     world::{Biome, Flora, Terrain, Tile, World},
 };
 
@@ -21,9 +22,7 @@ fn visible_tile_bounds(
     camera_visible_height: f32,
     padding: usize,
 ) -> (usize, usize, usize, usize) {
-    let aspect_ratio = screen_width() / screen_height().max(1.0);
-
-    let camera_visible_width = camera_visible_height * aspect_ratio;
+    let camera_visible_width = camera_visible_height * map_viewport_aspect_ratio();
 
     let left = camera_position.x - camera_visible_width / 2.0;
     let right = camera_position.x + camera_visible_width / 2.0;

@@ -10,19 +10,17 @@ use crate::camera::{
 };
 use crate::generation::generate_world;
 use crate::render::draw_world;
-use crate::ui::draw_hud;
+use crate::ui::{MapControls, draw_controls, draw_hud, mouse_is_over_sidebar};
 use macroquad::prelude::*;
 
 const WINDOW_WIDTH: i32 = 1280;
 const WINDOW_HEIGHT: i32 = 720;
 
-const WORLD_WIDTH: usize = 80;
-const WORLD_HEIGHT: usize = 50;
+const WORLD_WIDTH: usize = 240;
+const WORLD_HEIGHT: usize = 150;
 
 pub(crate) const TILE_PIXEL: f32 = 8.0;
-pub(crate) const DEFAULT_CAMERA_VISIBLE_HEIGHT: f32 = 350.0;
-
-const WORLD_SEED: &str = "Kevin'sIcyMaps";
+pub(crate) const DEFAULT_CAMERA_VISIBLE_HEIGHT: f32 = 630.0;
 
 const MAX_CAMERA_DELTA_SECONDS: f32 = 0.05;
 
@@ -59,7 +57,17 @@ fn window_conf() -> Conf {
 
 #[macroquad::main(window_conf)]
 async fn main() {
-    let world = generate_world(WORLD_WIDTH, WORLD_HEIGHT, WORLD_SEED);
+    let mut controls = MapControls::new();
+    let mut world = generate_world(
+        WORLD_WIDTH,
+        WORLD_HEIGHT,
+        &controls.seed,
+        controls.height_scale,
+        controls.moisture_scale,
+        controls.flora_density_scale,
+        controls.flora_type_scale,
+        controls.terrain_detail_scale,
+    );
 
     let world_center = vec2(
         world.width as f32 * TILE_PIXEL / 2.0,
@@ -94,7 +102,8 @@ async fn main() {
         let tile_x = (mouse_world.x / TILE_PIXEL).floor() as isize;
         let tile_y = (mouse_world.y / TILE_PIXEL).floor() as isize;
 
-        let hovered_tile = if tile_x >= 0
+        let hovered_tile = if !mouse_is_over_sidebar()
+            && tile_x >= 0
             && tile_y >= 0
             && tile_x < world.width as isize
             && tile_y < world.height as isize
@@ -119,6 +128,20 @@ async fn main() {
         set_default_camera();
 
         draw_hud(hovered_tile);
+
+        let regenerate = draw_controls(&mut controls);
+        if regenerate {
+            world = generate_world(
+                WORLD_WIDTH,
+                WORLD_HEIGHT,
+                &controls.seed,
+                controls.height_scale,
+                controls.moisture_scale,
+                controls.flora_density_scale,
+                controls.flora_type_scale,
+                controls.terrain_detail_scale,
+            );
+        }
 
         next_frame().await;
     }

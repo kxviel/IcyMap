@@ -3,23 +3,33 @@ use crate::{
     world::{Biome, Flora, Terrain, Tile, World},
 };
 
-const HEIGHT_NOISE_SCALE: f64 = 0.021; // large land shapes
-const MOISTURE_NOISE_SCALE: f64 = 0.014; // large moisture regions
-const FLORA_DENSITY_SCALE: f64 = 0.063; // where vegetation grows
-const FLORA_TYPE_SCALE: f64 = 0.14; // what vegetation grows
-const TERRAIN_DETAIL_SCALE: f64 = 0.14; // roughens terrain boundaries
-
 struct FloraSample {
     density: f32,
     kind: f32,
 }
 
-// World Generation
-
-pub(crate) fn generate_world(width: usize, height: usize, seed: &str) -> World {
+pub(crate) fn generate_world(
+    width: usize,
+    height: usize,
+    seed: &str,
+    height_scale: f32,
+    moisture_scale: f32,
+    flora_density_scale: f32,
+    flora_type_scale: f32,
+    terrain_detail_scale: f32,
+) -> World {
     let noise = WorldNoise::new(seed);
 
-    let (mut tiles, flora_samples) = generate_base_tiles(width, height, &noise);
+    let (mut tiles, flora_samples) = generate_base_tiles(
+        width,
+        height,
+        &noise,
+        height_scale,
+        moisture_scale,
+        flora_density_scale,
+        flora_type_scale,
+        terrain_detail_scale,
+    );
 
     apply_beaches(&mut tiles, width, height);
     apply_flora(&mut tiles, &flora_samples);
@@ -33,13 +43,29 @@ fn generate_base_tiles(
     width: usize,
     height: usize,
     noise: &WorldNoise,
+    height_scale: f32,
+    moisture_scale: f32,
+    flora_density_scale: f32,
+    flora_type_scale: f32,
+    terrain_detail_scale: f32,
 ) -> (Vec<Tile>, Vec<FloraSample>) {
     let mut tiles = Vec::with_capacity(width * height);
     let mut flora_samples = Vec::with_capacity(width * height);
 
     for y in 0..height {
         for x in 0..width {
-            let (tile, flora_sample) = generate_base_tile(x, y, width, height, noise);
+            let (tile, flora_sample) = generate_base_tile(
+                x,
+                y,
+                width,
+                height,
+                noise,
+                height_scale,
+                moisture_scale,
+                flora_density_scale,
+                flora_type_scale,
+                terrain_detail_scale,
+            );
 
             tiles.push(tile);
             flora_samples.push(flora_sample);
@@ -55,16 +81,37 @@ fn generate_base_tile(
     width: usize,
     height: usize,
     noise: &WorldNoise,
+    height_scale: f32,
+    moisture_scale: f32,
+    flora_density_scale: f32,
+    flora_type_scale: f32,
+    terrain_detail_scale: f32,
 ) -> (Tile, FloraSample) {
-    let raw_height = fbm_gen(&noise.height, x, y, HEIGHT_NOISE_SCALE, 5, 0.5, 2.0);
-    let moisture = fbm_gen(&noise.moisture, x, y, MOISTURE_NOISE_SCALE, 3, 0.5, 2.0);
-    let flora_density = fbm_gen(&noise.flora_density, x, y, FLORA_DENSITY_SCALE, 3, 0.5, 2.0);
-    let flora_type = fbm_gen(&noise.flora_type, x, y, FLORA_TYPE_SCALE, 1, 0.5, 2.0);
+    let raw_height = fbm_gen(&noise.height, x, y, height_scale as f64, 5, 0.5, 2.0);
+    let moisture = fbm_gen(&noise.moisture, x, y, moisture_scale as f64, 3, 0.5, 2.0);
+    let flora_density = fbm_gen(
+        &noise.flora_density,
+        x,
+        y,
+        flora_density_scale as f64,
+        3,
+        0.5,
+        2.0,
+    );
+    let flora_type = fbm_gen(
+        &noise.flora_type,
+        x,
+        y,
+        flora_type_scale as f64,
+        1,
+        0.5,
+        2.0,
+    );
     let terrain_detail = fbm_gen(
         &noise.terrain_detail,
         x,
         y,
-        TERRAIN_DETAIL_SCALE,
+        terrain_detail_scale as f64,
         2,
         0.5,
         2.0,
