@@ -26,6 +26,24 @@ const WORLD_SEED: &str = "Kevin'sIcyMaps";
 
 const MAX_CAMERA_DELTA_SECONDS: f32 = 0.05;
 
+fn load_icon(path: &str) -> Option<miniquad::conf::Icon> {
+    use image::imageops::FilterType;
+
+    let image = image::open(path)
+        .expect("Failed to load window icon")
+        .to_rgba8();
+
+    let small = image::imageops::resize(&image, 16, 16, FilterType::Lanczos3);
+    let medium = image::imageops::resize(&image, 32, 32, FilterType::Lanczos3);
+    let big = image::imageops::resize(&image, 64, 64, FilterType::Lanczos3);
+
+    Some(miniquad::conf::Icon {
+        small: small.into_raw().try_into().ok()?,
+        medium: medium.into_raw().try_into().ok()?,
+        big: big.into_raw().try_into().ok()?,
+    })
+}
+
 fn window_conf() -> Conf {
     Conf {
         window_title: "IcyMaps".to_string(),
@@ -34,6 +52,7 @@ fn window_conf() -> Conf {
         window_resizable: false,
         fullscreen: false,
         high_dpi: false,
+        icon: load_icon("assets/icymaps_icon_1024.png"),
         ..Default::default()
     }
 }
