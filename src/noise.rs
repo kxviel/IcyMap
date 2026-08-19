@@ -6,6 +6,7 @@ pub(crate) struct WorldNoise {
     pub(crate) flora_density: Perlin,
     pub(crate) flora_type: Perlin,
     pub(crate) terrain_detail: Perlin,
+    pub(crate) lava: Perlin,
 }
 
 pub(crate) struct NoiseScales {
@@ -70,6 +71,7 @@ impl WorldNoise {
             flora_density: Perlin::new(seed_to_u32(seed, 300)),
             flora_type: Perlin::new(seed_to_u32(seed, 400)),
             terrain_detail: Perlin::new(seed_to_u32(seed, 500)),
+            lava: Perlin::new(seed_to_u32(seed, 600)),
         }
     }
 }

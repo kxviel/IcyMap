@@ -222,7 +222,7 @@ fn get_tile_color(tile: &Tile) -> Color {
         }
 
         Biome::Land => match tile.terrain {
-            Some(Terrain::Grass) => {
+            Some(Terrain::Grassy) => {
                 let wetness = ((tile.moisture - 0.40) / 0.42).clamp(0.0, 1.0);
 
                 let dry = Color::from_rgba(105, 126, 80, 255);
@@ -258,6 +258,34 @@ fn get_tile_color(tile: &Tile) -> Color {
                 let high = Color::from_rgba(113, 114, 106, 255);
 
                 lerp_color(low, high, elevation)
+            }
+
+            Some(Terrain::Lava) => {
+                let heat = ((tile.height - 0.52) / 0.30).clamp(0.0, 1.0);
+                let dark = Color::from_rgba(90, 15, 10, 255);
+                let hot = Color::from_rgba(255, 215, 50, 255);
+
+                lerp_color(dark, hot, heat)
+
+                // // 1. Get the current time (assuming you are using macroquad's get_time())
+                // let time = macroquad::time::get_time() as f32;
+
+                // // 2. Create overlapping waves using the tile's x/y position and time
+                // // Tweak the 0.3 (scale) and 2.0/1.5 (speed) to change the bubble size and speed
+                // let wave_x = (tile. as f32 * 0.3 + time * 2.0).sin();
+                // let wave_y = (tile.y as f32 * 0.3 + time * 1.5).cos();
+
+                // // 3. Combine them to create an irregular, shifting offset
+                // // Multiplied by 0.15 to keep the bubbling subtle so it doesn't completely overwrite the base height
+                // let churn_offset = (wave_x * wave_y) * 0.15;
+
+                // // 4. Add the churn offset to the base height calculation
+                // let heat = ((tile.height + churn_offset - 0.52) / 0.30).clamp(0.0, 1.0);
+
+                // let dark = Color::from_rgba(90, 15, 10, 255);
+                // let hot = Color::from_rgba(255, 215, 50, 255);
+
+                // lerp_color(dark, hot, heat)
             }
 
             None => Color::from_rgba(100, 125, 80, 255),

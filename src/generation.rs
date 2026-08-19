@@ -17,6 +17,8 @@ struct FloraSample {
     kind: f32,
 }
 
+// Main API
+
 pub(crate) fn generate_world(
     width: usize,
     height: usize,
@@ -33,7 +35,7 @@ pub(crate) fn generate_world(
     World::from_tiles(width, height, tiles)
 }
 
-// Base Terrain Generation
+// Phase 1: Base Terrain Generation
 
 fn generate_base_tiles(
     width: usize,
@@ -93,12 +95,11 @@ fn generate_base_tile(
         0.5,
         2.0,
     );
+    let lava = fbm_gen(&noise.lava, x, y, 0.025, 3, 0.5, 2.0);
 
     let shaped_height = apply_island_shape(raw_height, x, y, width, height);
-
     let biome = choose_biome(shaped_height);
-
-    let terrain = generate_terrain(biome, shaped_height, moisture, terrain_detail);
+    let terrain = generate_terrain(biome, shaped_height, moisture, terrain_detail, lava);
 
     let tile = Tile {
         height: shaped_height,
@@ -116,24 +117,52 @@ fn generate_base_tile(
     (tile, flora_sample)
 }
 
-fn generate_terrain(biome: Biome, height: f32, moisture: f32, detail: f32) -> Option<Terrain> {
+fn choose_biome(height: f32) -> Biome {
+    if height < DEEP_WATER_MAX_HEIGHT {
+        Biome::DeepWater
+    } else if height < SHALLOW_WATER_MAX_HEIGHT {
+        Biome::ShallowWater
+    } else {
+        Biome::Land
+    }
+}
+
+fn generate_terrain(
+    biome: Biome,
+    height: f32,
+    moisture: f32,
+    detail: f32,
+    lava: f32,
+) -> Option<Terrain> {
     match biome {
         Biome::DeepWater | Biome::ShallowWater => None,
 
         Biome::Land => {
             let rock_threshold = ROCK_BASE_HEIGHT + (detail - 0.5) * ROCK_DETAIL_RANGE;
+
             let soil_threshold = SOIL_BASE_HEIGHT + (detail - 0.5) * SOIL_DETAIL_RANGE;
 
-            if height > rock_threshold {
+            // Lava core
+            if height > 0.52 && lava > 0.70 {
+                Some(Terrain::Lava)
+
+            // Rocky volcanic surroundings
+            } else if height > 0.48 && lava > 0.58 {
+                Some(Terrain::Rock)
+
+            // Normal mountains
+            } else if height > rock_threshold {
                 Some(Terrain::Rock)
             } else if moisture < soil_threshold {
                 Some(Terrain::Soil)
             } else {
-                Some(Terrain::Grass)
+                Some(Terrain::Grassy)
             }
         }
     }
 }
+
+// Phase 2: Beach Application
 
 fn apply_beaches(tiles: &mut [Tile], width: usize, height: usize) {
     for y in 0..height {
@@ -143,7 +172,7 @@ fn apply_beaches(tiles: &mut [Tile], width: usize, height: usize) {
             let can_be_beach = tiles[index].biome == Biome::Land
                 && matches!(
                     tiles[index].terrain,
-                    Some(Terrain::Grass) | Some(Terrain::Soil)
+                    Some(Terrain::Grassy) | Some(Terrain::Soil)
                 );
 
             if !can_be_beach {
@@ -166,7 +195,6 @@ fn has_shallow_water_neighbor(
 ) -> bool {
     for offset_y in -1..=1 {
         for offset_x in -1..=1 {
-            // Skip the tile itself.
             if offset_x == 0 && offset_y == 0 {
                 continue;
             }
@@ -174,7 +202,6 @@ fn has_shallow_water_neighbor(
             let neighbor_x = x as isize + offset_x;
             let neighbor_y = y as isize + offset_y;
 
-            // Ignore positions outside the world.
             if neighbor_x < 0
                 || neighbor_y < 0
                 || neighbor_x >= width as isize
@@ -194,6 +221,8 @@ fn has_shallow_water_neighbor(
     false
 }
 
+// Phase 3: Flora Application
+
 fn apply_flora(tiles: &mut [Tile], flora_samples: &[FloraSample]) {
     debug_assert_eq!(tiles.len(), flora_samples.len());
 
@@ -209,7 +238,7 @@ fn generate_flora(
     kind: f32,
 ) -> Option<Flora> {
     match terrain {
-        Some(Terrain::Grass) => {
+        Some(Terrain::Grassy) => {
             let threshold = if moisture > 0.68 {
                 0.52
             } else if moisture > 0.52 {
@@ -249,17 +278,11 @@ fn generate_flora(
             }
         }
 
-        Some(Terrain::Sand) | Some(Terrain::Rock) | None => None,
+        Some(Terrain::Sand) | Some(Terrain::Rock) | Some(Terrain::Lava) | None => None,
     }
 }
 
-fn normalize_axis(position: usize, size: usize) -> f32 {
-    if size <= 1 {
-        0.0
-    } else {
-        position as f32 / (size - 1) as f32 * 2.0 - 1.0
-    }
-}
+// Math & Utility Helpers
 
 fn apply_island_shape(height_value: f32, x: usize, y: usize, width: usize, height: usize) -> f32 {
     let distance_x = normalize_axis(x, width);
@@ -270,18 +293,15 @@ fn apply_island_shape(height_value: f32, x: usize, y: usize, width: usize, heigh
         .min(1.0);
 
     let island_factor = 1.0 - distance;
-
     let shaped_height = height_value * 0.60 + island_factor * 0.40 - 0.08;
 
     shaped_height.clamp(0.0, 1.0)
 }
 
-fn choose_biome(height: f32) -> Biome {
-    if height < DEEP_WATER_MAX_HEIGHT {
-        Biome::DeepWater
-    } else if height < SHALLOW_WATER_MAX_HEIGHT {
-        Biome::ShallowWater
+fn normalize_axis(position: usize, size: usize) -> f32 {
+    if size <= 1 {
+        0.0
     } else {
-        Biome::Land
+        position as f32 / (size - 1) as f32 * 2.0 - 1.0
     }
 }
