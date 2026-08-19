@@ -72,7 +72,7 @@ fn draw_ground_layer(world: &World, bounds: TileBounds) {
                 world_y,
                 TILE_PIXEL,
                 TILE_PIXEL,
-                get_tile_color(tile),
+                get_tile_color(tile, x, y),
             );
         }
     }
@@ -200,7 +200,7 @@ fn lerp_color(a: Color, b: Color, t: f32) -> Color {
     )
 }
 
-fn get_tile_color(tile: &Tile) -> Color {
+fn get_tile_color(tile: &Tile, tile_x: usize, tile_y: usize) -> Color {
     match tile.biome {
         Biome::DeepWater => {
             let depth = (tile.height / DEEP_WATER_MAX_HEIGHT).clamp(0.0, 1.0);
@@ -261,31 +261,43 @@ fn get_tile_color(tile: &Tile) -> Color {
             }
 
             Some(Terrain::Lava) => {
-                let heat = ((tile.height - 0.52) / 0.30).clamp(0.0, 1.0);
-                let dark = Color::from_rgba(90, 15, 10, 255);
-                let hot = Color::from_rgba(255, 215, 50, 255);
+                // 1. Get the current time (assuming you are using macroquad's get_time())
+                let time = macroquad::time::get_time() as f32;
 
-                lerp_color(dark, hot, heat)
+                let x = tile_x as f32;
+                let y = tile_y as f32;
 
-                // // 1. Get the current time (assuming you are using macroquad's get_time())
-                // let time = macroquad::time::get_time() as f32;
+                // Large slow-moving lava flow
+                let wave1 = (x * 0.22 + y * 0.13 + time * 0.8).sin();
 
-                // // 2. Create overlapping waves using the tile's x/y position and time
-                // // Tweak the 0.3 (scale) and 2.0/1.5 (speed) to change the bubble size and speed
-                // let wave_x = (tile. as f32 * 0.3 + time * 2.0).sin();
-                // let wave_y = (tile.y as f32 * 0.3 + time * 1.5).cos();
+                // Another wave travelling in a different direction
+                let wave2 = (x * -0.11 + y * 0.27 + time * 0.55).sin();
 
-                // // 3. Combine them to create an irregular, shifting offset
-                // // Multiplied by 0.15 to keep the bubbling subtle so it doesn't completely overwrite the base height
-                // let churn_offset = (wave_x * wave_y) * 0.15;
+                // Smaller detail variation
+                let wave3 = (x * 0.47 - y * 0.31 + time * 1.15).sin();
 
-                // // 4. Add the churn offset to the base height calculation
-                // let heat = ((tile.height + churn_offset - 0.52) / 0.30).clamp(0.0, 1.0);
+                // Combine them without making the pattern too strong
+                let movement = wave1 * 0.50 + wave2 * 0.30 + wave3 * 0.20;
 
-                // let dark = Color::from_rgba(90, 15, 10, 255);
-                // let hot = Color::from_rgba(255, 215, 50, 255);
+                // Convert approximately -1..1 → 0..1
+                let movement = movement * 0.5 + 0.5;
 
-                // lerp_color(dark, hot, heat)
+                // Base heat still depends on elevation
+                let base_heat = ((tile.height - 0.52) / 0.30).clamp(0.0, 1.0);
+
+                // Only slightly perturb the colour
+                let heat = (base_heat * 0.75 + movement * 0.25).clamp(0.0, 1.0);
+
+                let dark = Color::from_rgba(55, 12, 8, 255);
+                let red = Color::from_rgba(175, 40, 15, 255);
+                let hot = Color::from_rgba(255, 155, 35, 255);
+
+                // Two-stage gradient gives much nicer lava
+                if heat < 0.65 {
+                    lerp_color(dark, red, heat / 0.65)
+                } else {
+                    lerp_color(red, hot, (heat - 0.65) / 0.35)
+                }
             }
 
             None => Color::from_rgba(100, 125, 80, 255),
