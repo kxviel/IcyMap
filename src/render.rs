@@ -74,7 +74,7 @@ fn draw_ground_layer(world: &World, bounds: TileBounds) {
                 world_y,
                 TILE_PIXEL,
                 TILE_PIXEL,
-                get_tile_color(tile, x, y),
+                get_tile_color(tile),
             );
         }
     }
@@ -202,7 +202,7 @@ fn lerp_color(a: Color, b: Color, t: f32) -> Color {
     )
 }
 
-fn get_tile_color(tile: &Tile, tile_x: usize, tile_y: usize) -> Color {
+fn get_tile_color(tile: &Tile) -> Color {
     match tile.biome {
         Biome::DeepWater => {
             let depth = (tile.height / DEEP_WATER_MAX_HEIGHT).clamp(0.0, 1.0);
@@ -262,7 +262,7 @@ fn get_tile_color(tile: &Tile, tile_x: usize, tile_y: usize) -> Color {
                 lerp_color(low, high, elevation)
             }
 
-            Some(Terrain::Lava) | Some(Terrain::Snow) | None => Color::from_rgba(100, 125, 80, 255),
+            Some(Terrain::Snow) | None => Color::from_rgba(100, 125, 80, 255),
         },
 
         Biome::Mountain => match tile.terrain {
@@ -284,53 +284,9 @@ fn get_tile_color(tile: &Tile, tile_x: usize, tile_y: usize) -> Color {
                 lerp_color(shaded, bright, elevation)
             }
 
-            Some(Terrain::Lava)
-            | Some(Terrain::Sand)
-            | Some(Terrain::Soil)
-            | Some(Terrain::Grassy)
-            | None => Color::from_rgba(96, 98, 93, 255),
-        },
-
-        Biome::Volcano => match tile.terrain {
-            Some(Terrain::Lava) => get_lava_color(tile, tile_x, tile_y),
-
-            Some(Terrain::Rock) => {
-                let elevation = ((tile.height - SHALLOW_WATER_MAX_HEIGHT) / 0.40).clamp(0.0, 1.0);
-                let low = Color::from_rgba(45, 41, 38, 255);
-                let high = Color::from_rgba(60, 53, 48, 255);
-
-                lerp_color(low, high, elevation)
+            Some(Terrain::Sand) | Some(Terrain::Soil) | Some(Terrain::Grassy) | None => {
+                Color::from_rgba(96, 98, 93, 255)
             }
-
-            Some(Terrain::Sand)
-            | Some(Terrain::Soil)
-            | Some(Terrain::Grassy)
-            | Some(Terrain::Snow)
-            | None => Color::from_rgba(45, 41, 38, 255),
         },
-    }
-}
-
-fn get_lava_color(tile: &Tile, tile_x: usize, tile_y: usize) -> Color {
-    let time = macroquad::time::get_time() as f32;
-    let x = tile_x as f32;
-    let y = tile_y as f32;
-
-    let wave1 = (x * 0.22 + y * 0.13 + time * 0.8).sin();
-    let wave2 = (x * -0.11 + y * 0.27 + time * 0.55).sin();
-    let wave3 = (x * 0.47 - y * 0.31 + time * 1.15).sin();
-    let movement = (wave1 * 0.50 + wave2 * 0.30 + wave3 * 0.20) * 0.5 + 0.5;
-
-    let base_heat = ((tile.height - 0.52) / 0.30).clamp(0.0, 1.0);
-    let heat = (base_heat * 0.75 + movement * 0.25).clamp(0.0, 1.0);
-
-    let crust = Color::from_rgba(35, 18, 15, 255);
-    let red = Color::from_rgba(145, 30, 12, 255);
-    let hot = Color::from_rgba(255, 105, 15, 255);
-
-    if heat < 0.65 {
-        lerp_color(crust, red, heat / 0.65)
-    } else {
-        lerp_color(red, hot, (heat - 0.65) / 0.35)
     }
 }

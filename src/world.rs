@@ -4,12 +4,10 @@ pub(crate) enum Biome {
     ShallowWater,
     Land,
     Mountain,
-    Volcano,
 }
 
 #[derive(Clone, Copy, Debug)]
 pub(crate) enum Terrain {
-    Lava,
     Sand,
     Soil,
     Grassy,

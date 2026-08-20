@@ -14,9 +14,6 @@ pub(crate) const SNOW_BASE_HEIGHT: f32 = 0.62;
 pub(crate) const SOIL_BASE_HEIGHT: f32 = 0.40;
 pub(crate) const SOIL_DETAIL_RANGE: f32 = 0.06;
 
-const VOLCANO_MIN_LAVA: f32 = 0.64;
-const VOLCANO_LAVA_MIN_STRENGTH: f32 = 0.73;
-
 struct FloraSample {
     density: f32,
     kind: f32,
@@ -100,11 +97,9 @@ fn generate_base_tile(
         0.5,
         2.0,
     );
-    let lava = fbm_gen(&noise.lava, x, y, 0.025, 3, 0.5, 2.0);
-
     let shaped_height = apply_island_shape(raw_height, x, y, width, height);
-    let biome = choose_biome(shaped_height, lava);
-    let terrain = generate_terrain(biome, shaped_height, moisture, terrain_detail, lava);
+    let biome = choose_biome(shaped_height);
+    let terrain = generate_terrain(biome, shaped_height, moisture, terrain_detail);
 
     let tile = Tile {
         height: shaped_height,
@@ -122,13 +117,11 @@ fn generate_base_tile(
     (tile, flora_sample)
 }
 
-fn choose_biome(height: f32, lava: f32) -> Biome {
+fn choose_biome(height: f32) -> Biome {
     if height < DEEP_WATER_MAX_HEIGHT {
         Biome::DeepWater
     } else if height < SHALLOW_WATER_MAX_HEIGHT {
         Biome::ShallowWater
-    } else if lava > VOLCANO_MIN_LAVA {
-        Biome::Volcano
     } else if height > MOUNTAIN_MIN_HEIGHT {
         Biome::Mountain
     } else {
@@ -136,26 +129,9 @@ fn choose_biome(height: f32, lava: f32) -> Biome {
     }
 }
 
-fn generate_terrain(
-    biome: Biome,
-    height: f32,
-    moisture: f32,
-    detail: f32,
-    lava: f32,
-) -> Option<Terrain> {
+fn generate_terrain(biome: Biome, height: f32, moisture: f32, detail: f32) -> Option<Terrain> {
     match biome {
         Biome::DeepWater | Biome::ShallowWater => None,
-
-        Biome::Volcano => {
-            let lava_strength =
-                lava + (detail - 0.5) * 0.12 + (height - SHALLOW_WATER_MAX_HEIGHT) * 0.08;
-
-            if lava_strength > VOLCANO_LAVA_MIN_STRENGTH {
-                Some(Terrain::Lava)
-            } else {
-                Some(Terrain::Rock)
-            }
-        }
 
         Biome::Mountain => {
             let snow_line = SNOW_BASE_HEIGHT + (detail - 0.5) * 0.06;
@@ -299,8 +275,7 @@ fn generate_flora(
             }
         }
 
-        Some(Terrain::Sand) | Some(Terrain::Rock) | Some(Terrain::Snow) | Some(Terrain::Lava)
-        | None => None,
+        Some(Terrain::Sand) | Some(Terrain::Rock) | Some(Terrain::Snow) | None => None,
     }
 }
 
