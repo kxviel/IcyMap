@@ -7,8 +7,9 @@ IcyMaps is a deterministic procedural map generator and viewer built with Rust a
 ## Current functionality
 
 - Seeded Perlin/fBm world generation
-- Island shaping
+- Seed-driven island or mainland shaping
 - Deep and shallow water
+- Optional inland lakes and downhill rivers
 - Sand, soil, grass, and rock terrain
 - Moisture-driven terrain variation
 - Procedural flowers, bushes, and trees
@@ -24,7 +25,7 @@ IcyMaps is a deterministic procedural map generator and viewer built with Rust a
 src/
 ├── main.rs        # application setup and frame loop
 ├── camera.rs      # camera movement, smoothing, clamping, and mouse conversion
-├── generation.rs  # seeded noise, island shaping, terrain, beaches, and flora
+├── generation.rs  # seeded world profiles, terrain, water features, and flora
 ├── render.rs      # visible tile bounds and map layers
 ├── ui.rs          # HUD and tile inspector
 └── world.rs       # map data types and tile storage
@@ -34,9 +35,9 @@ src/
 
 - The same seed and generation parameters must produce the same map.
 - Generation changes should remain explicit and testable.
-- Existing world dimensions, terrain thresholds, island shaping, and visual style should stay stable unless a change is intentional.
+- Existing world dimensions, terrain thresholds, deterministic world profiles, and visual style should stay stable unless a change is intentional.
 - Rendering and UI must consume the generated world without mutating it.
 
 ## Future direction
 
-IcyMaps can later expose selected generation parameters through a small control panel and regenerate the map without restarting. Useful controls include the seed, Perlin/fBm scales, octave settings, and explicit presets such as large islands, small islands, archipelagos, or one dominant island. Each mode should remain deterministic and display its active values.
+IcyMaps can later expose selected generation parameters through a small control panel and regenerate the map without restarting. Useful controls include the seed, Perlin/fBm scales, octave settings, and explicit presets for island or mainland profiles. Each mode should remain deterministic and display its active values.

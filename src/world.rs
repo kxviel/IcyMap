@@ -1,10 +1,12 @@
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Biome {
-    ShallowWater,
     DeepWater,
+    ShallowWater,
     Land,
-    // Swamp,
-    // Rot,
+    Mountain,
+    Rot,
+    Swamp,
+    Volcano,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -14,43 +16,21 @@ pub(crate) enum Terrain {
     Soil,
     Grassy,
     Rock,
-    // Mud,
-    // RotSoil,
-    // RotPool,
-    // SwampPool,
+    Snow,
+    Mud,
+    SwampWater,
 }
 
 #[derive(Clone, Copy, Debug)]
 pub(crate) enum Flora {
     Flower,
     Bush,
+    DeadTree,
+    MangroveTree,
+    Reeds,
     ShortTree,
     TallTree,
-    // // Swamp
-    // Reeds,
-    // Mushroom,
-    // DeadTree,
-    // // Rot
-    // RotBloom,
-    // Fungus,
 }
-
-// #[derive(Clone, Copy, Debug)]
-// pub(crate) enum Fauna {
-//     // Normal
-//     Deer,
-//     Rabbit,
-
-//     // Swamp
-//     Frog,
-//     Snake,
-//     Crocodile,
-
-//     // Rot
-//     RotBug,
-//     RotHound,
-//     RotBird,
-// }
 
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct Tile {
