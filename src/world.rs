@@ -4,8 +4,6 @@ pub(crate) enum Biome {
     ShallowWater,
     Land,
     Mountain,
-    Rot,
-    Swamp,
     Volcano,
 }
 
@@ -17,17 +15,12 @@ pub(crate) enum Terrain {
     Grassy,
     Rock,
     Snow,
-    Mud,
-    SwampWater,
 }
 
 #[derive(Clone, Copy, Debug)]
 pub(crate) enum Flora {
     Flower,
     Bush,
-    DeadTree,
-    MangroveTree,
-    Reeds,
     ShortTree,
     TallTree,
 }

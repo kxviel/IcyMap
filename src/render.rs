@@ -133,98 +133,6 @@ fn draw_flora(flora: Flora, x: f32, y: f32, tile_size: f32) {
             );
         }
 
-        Flora::DeadTree => {
-            let wood = Color::from_rgba(18, 16, 17, 255);
-
-            draw_line(
-                center_x,
-                center_y + tile_size * 0.28,
-                center_x,
-                center_y - tile_size * 0.28,
-                1.0,
-                wood,
-            );
-            draw_line(
-                center_x,
-                center_y - tile_size * 0.08,
-                center_x - tile_size * 0.20,
-                center_y - tile_size * 0.24,
-                1.0,
-                wood,
-            );
-            draw_line(
-                center_x,
-                center_y - tile_size * 0.02,
-                center_x + tile_size * 0.21,
-                center_y - tile_size * 0.20,
-                1.0,
-                wood,
-            );
-        }
-
-        Flora::MangroveTree => {
-            let wood = Color::from_rgba(67, 50, 35, 255);
-
-            draw_rectangle(
-                center_x - tile_size * 0.05,
-                center_y - tile_size * 0.02,
-                tile_size * 0.10,
-                tile_size * 0.30,
-                wood,
-            );
-            draw_line(
-                center_x,
-                center_y + tile_size * 0.16,
-                center_x - tile_size * 0.18,
-                center_y + tile_size * 0.30,
-                1.0,
-                wood,
-            );
-            draw_line(
-                center_x,
-                center_y + tile_size * 0.16,
-                center_x + tile_size * 0.18,
-                center_y + tile_size * 0.30,
-                1.0,
-                wood,
-            );
-            draw_circle(
-                center_x,
-                center_y - tile_size * 0.08,
-                tile_size * 0.27,
-                Color::from_rgba(45, 72, 48, 255),
-            );
-        }
-
-        Flora::Reeds => {
-            let green = Color::from_rgba(91, 104, 61, 255);
-
-            draw_line(
-                center_x - tile_size * 0.13,
-                center_y + tile_size * 0.22,
-                center_x - tile_size * 0.10,
-                center_y - tile_size * 0.18,
-                1.0,
-                green,
-            );
-            draw_line(
-                center_x,
-                center_y + tile_size * 0.22,
-                center_x,
-                center_y - tile_size * 0.25,
-                1.0,
-                green,
-            );
-            draw_line(
-                center_x + tile_size * 0.13,
-                center_y + tile_size * 0.22,
-                center_x + tile_size * 0.10,
-                center_y - tile_size * 0.14,
-                1.0,
-                green,
-            );
-        }
-
         Flora::ShortTree => {
             // trunk
             draw_rectangle(
@@ -354,11 +262,7 @@ fn get_tile_color(tile: &Tile, tile_x: usize, tile_y: usize) -> Color {
                 lerp_color(low, high, elevation)
             }
 
-            Some(Terrain::Lava)
-            | Some(Terrain::Snow)
-            | Some(Terrain::Mud)
-            | Some(Terrain::SwampWater)
-            | None => Color::from_rgba(100, 125, 80, 255),
+            Some(Terrain::Lava) | Some(Terrain::Snow) | None => Color::from_rgba(100, 125, 80, 255),
         },
 
         Biome::Mountain => match tile.terrain {
@@ -384,43 +288,7 @@ fn get_tile_color(tile: &Tile, tile_x: usize, tile_y: usize) -> Color {
             | Some(Terrain::Sand)
             | Some(Terrain::Soil)
             | Some(Terrain::Grassy)
-            | Some(Terrain::Mud)
-            | Some(Terrain::SwampWater)
             | None => Color::from_rgba(96, 98, 93, 255),
-        },
-
-        Biome::Rot => {
-            let wetness = tile.moisture.clamp(0.0, 1.0);
-            let dry = Color::from_rgba(61, 45, 48, 255);
-            let damp = Color::from_rgba(40, 32, 36, 255);
-
-            lerp_color(dry, damp, wetness)
-        }
-
-        Biome::Swamp => match tile.terrain {
-            Some(Terrain::SwampWater) => {
-                let wetness = ((tile.moisture - 0.70) / 0.20).clamp(0.0, 1.0);
-                let shallow = Color::from_rgba(45, 67, 49, 255);
-                let deep = Color::from_rgba(37, 55, 42, 255);
-
-                lerp_color(shallow, deep, wetness)
-            }
-
-            Some(Terrain::Mud) => {
-                let wetness = ((tile.moisture - 0.70) / 0.20).clamp(0.0, 1.0);
-                let dry = Color::from_rgba(91, 77, 52, 255);
-                let wet = Color::from_rgba(78, 69, 48, 255);
-
-                lerp_color(dry, wet, wetness)
-            }
-
-            Some(Terrain::Lava)
-            | Some(Terrain::Sand)
-            | Some(Terrain::Soil)
-            | Some(Terrain::Grassy)
-            | Some(Terrain::Rock)
-            | Some(Terrain::Snow)
-            | None => Color::from_rgba(78, 69, 48, 255),
         },
 
         Biome::Volcano => match tile.terrain {
@@ -438,8 +306,6 @@ fn get_tile_color(tile: &Tile, tile_x: usize, tile_y: usize) -> Color {
             | Some(Terrain::Soil)
             | Some(Terrain::Grassy)
             | Some(Terrain::Snow)
-            | Some(Terrain::Mud)
-            | Some(Terrain::SwampWater)
             | None => Color::from_rgba(45, 41, 38, 255),
         },
     }

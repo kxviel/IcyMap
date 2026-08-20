@@ -15,10 +15,7 @@ pub(crate) const SOIL_BASE_HEIGHT: f32 = 0.40;
 pub(crate) const SOIL_DETAIL_RANGE: f32 = 0.06;
 
 const VOLCANO_MIN_LAVA: f32 = 0.64;
-const ROT_MIN_STRENGTH: f32 = 0.68;
-const SWAMP_MIN_MOISTURE: f32 = 0.70;
 const VOLCANO_LAVA_MIN_STRENGTH: f32 = 0.73;
-const SWAMP_WATER_MIN_WETNESS: f32 = 0.76;
 
 struct FloraSample {
     density: f32,
@@ -104,10 +101,9 @@ fn generate_base_tile(
         2.0,
     );
     let lava = fbm_gen(&noise.lava, x, y, 0.025, 3, 0.5, 2.0);
-    let rot = fbm_gen(&noise.rot, x, y, 0.015, 3, 0.5, 2.0);
 
     let shaped_height = apply_island_shape(raw_height, x, y, width, height);
-    let biome = choose_biome(shaped_height, moisture, lava, rot);
+    let biome = choose_biome(shaped_height, lava);
     let terrain = generate_terrain(biome, shaped_height, moisture, terrain_detail, lava);
 
     let tile = Tile {
@@ -126,7 +122,7 @@ fn generate_base_tile(
     (tile, flora_sample)
 }
 
-fn choose_biome(height: f32, moisture: f32, lava: f32, rot: f32) -> Biome {
+fn choose_biome(height: f32, lava: f32) -> Biome {
     if height < DEEP_WATER_MAX_HEIGHT {
         Biome::DeepWater
     } else if height < SHALLOW_WATER_MAX_HEIGHT {
@@ -135,10 +131,6 @@ fn choose_biome(height: f32, moisture: f32, lava: f32, rot: f32) -> Biome {
         Biome::Volcano
     } else if height > MOUNTAIN_MIN_HEIGHT {
         Biome::Mountain
-    } else if rot > ROT_MIN_STRENGTH {
-        Biome::Rot
-    } else if moisture > SWAMP_MIN_MOISTURE {
-        Biome::Swamp
     } else {
         Biome::Land
     }
@@ -165,16 +157,6 @@ fn generate_terrain(
             }
         }
 
-        Biome::Swamp => {
-            let wetness = moisture + (detail - 0.5) * 0.16;
-
-            if wetness > SWAMP_WATER_MIN_WETNESS {
-                Some(Terrain::SwampWater)
-            } else {
-                Some(Terrain::Mud)
-            }
-        }
-
         Biome::Mountain => {
             let snow_line = SNOW_BASE_HEIGHT + (detail - 0.5) * 0.06;
 
@@ -184,8 +166,6 @@ fn generate_terrain(
                 Some(Terrain::Rock)
             }
         }
-
-        Biome::Rot => Some(Terrain::Soil),
 
         Biome::Land => {
             let rock_threshold = ROCK_BASE_HEIGHT + (detail - 0.5) * ROCK_DETAIL_RANGE;
@@ -268,45 +248,11 @@ fn apply_flora(tiles: &mut [Tile], flora_samples: &[FloraSample]) {
     debug_assert_eq!(tiles.len(), flora_samples.len());
 
     for (tile, sample) in tiles.iter_mut().zip(flora_samples.iter()) {
-        tile.flora = generate_flora(
-            tile.biome,
-            tile.terrain,
-            tile.moisture,
-            sample.density,
-            sample.kind,
-        );
+        tile.flora = generate_flora(tile.terrain, tile.moisture, sample.density, sample.kind);
     }
 }
 
 fn generate_flora(
-    biome: Biome,
-    terrain: Option<Terrain>,
-    moisture: f32,
-    density: f32,
-    kind: f32,
-) -> Option<Flora> {
-    match biome {
-        Biome::Rot => {
-            if matches!(terrain, Some(Terrain::Soil)) && density > 0.60 {
-                Some(Flora::DeadTree)
-            } else {
-                None
-            }
-        }
-
-        Biome::Swamp => match terrain {
-            Some(Terrain::Mud) if density > 0.60 => Some(Flora::MangroveTree),
-            Some(Terrain::SwampWater) if density > 0.58 => Some(Flora::Reeds),
-            _ => None,
-        },
-
-        Biome::Land => generate_land_flora(terrain, moisture, density, kind),
-
-        Biome::DeepWater | Biome::ShallowWater | Biome::Mountain | Biome::Volcano => None,
-    }
-}
-
-fn generate_land_flora(
     terrain: Option<Terrain>,
     moisture: f32,
     density: f32,
@@ -353,12 +299,7 @@ fn generate_land_flora(
             }
         }
 
-        Some(Terrain::Sand)
-        | Some(Terrain::Rock)
-        | Some(Terrain::Snow)
-        | Some(Terrain::Lava)
-        | Some(Terrain::Mud)
-        | Some(Terrain::SwampWater)
+        Some(Terrain::Sand) | Some(Terrain::Rock) | Some(Terrain::Snow) | Some(Terrain::Lava)
         | None => None,
     }
 }
