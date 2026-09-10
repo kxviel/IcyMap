@@ -1,9 +1,10 @@
 use crate::noise::NoiseScales;
-use crate::world::Tile;
+use crate::world::{Biome, Flora, Terrain, Tile};
 use macroquad::prelude::*;
-use macroquad::ui::{Id, Skin, Ui, hash, root_ui, widgets};
+use macroquad::ui::{Skin, Ui, hash, root_ui, widgets};
+use std::ops::RangeInclusive;
 
-pub(crate) const SIDEBAR_WIDTH: f32 = 270.0;
+pub const SIDEBAR_WIDTH: f32 = 270.0;
 const SIDE_PADDING: f32 = 18.0;
 const HEADER_HEIGHT: f32 = 50.0;
 
@@ -11,89 +12,98 @@ const SCALE_STEP: f32 = 0.001;
 const SCALE_ROW_WIDTH: f32 = SIDEBAR_WIDTH - SIDE_PADDING * 2.0;
 const SCALE_ROW_HEIGHT: f32 = 38.0;
 const SCALE_ROW_GAP: f32 = 7.0;
-const SCALE_INPUT_X: f32 = 112.0;
-const SCALE_INPUT_WIDTH: f32 = 88.0;
 const SCALE_BUTTON_X: f32 = 204.0;
 const SCALE_BUTTON_WIDTH: f32 = 28.0;
 const SCALE_BUTTON_HEIGHT: f32 = 15.0;
 
-const INSPECTOR_WIDTH: f32 = 210.0;
-const INSPECTOR_HEIGHT: f32 = 145.0;
-
-pub(crate) struct MapControls {
-    pub(crate) seed: String,
-    pub(crate) height_scale: f32,
-    pub(crate) moisture_scale: f32,
-    pub(crate) flora_density_scale: f32,
-    pub(crate) flora_type_scale: f32,
-    pub(crate) terrain_detail_scale: f32,
-    height_scale_input: String,
-    moisture_scale_input: String,
-    flora_density_scale_input: String,
-    flora_type_scale_input: String,
-    terrain_detail_scale_input: String,
+pub struct MapControls {
+    pub seed: String,
+    pub focused: bool,
+    scales: [ScaleInput; 5],
     skin: Skin,
 }
 
 impl MapControls {
-    pub(crate) fn new() -> Self {
+    pub fn new() -> Self {
+        let defaults = NoiseScales::default();
+
         Self {
             seed: String::from("Kevin'sIcyMaps"),
-            height_scale: 0.021,
-            moisture_scale: 0.014,
-            flora_density_scale: 0.063,
-            flora_type_scale: 0.140,
-            terrain_detail_scale: 0.140,
-            height_scale_input: String::from("0.021"),
-            moisture_scale_input: String::from("0.014"),
-            flora_density_scale_input: String::from("0.063"),
-            flora_type_scale_input: String::from("0.140"),
-            terrain_detail_scale_input: String::from("0.140"),
+            focused: false,
+            scales: [
+                ScaleInput::new("Height", defaults.height, 0.005..=0.150),
+                ScaleInput::new("Moisture", defaults.moisture, 0.005..=0.150),
+                ScaleInput::new("Flora density", defaults.flora_density, 0.005..=0.200),
+                ScaleInput::new("Flora type", defaults.flora_type, 0.005..=0.250),
+                ScaleInput::new("Terrain detail", defaults.terrain_detail, 0.005..=0.250),
+            ],
             skin: controls_skin(),
         }
     }
 
-    pub(crate) fn noise_scales(&self) -> NoiseScales {
+    pub fn noise_scales(&self) -> NoiseScales {
+        let [height, moisture, flora_density, flora_type, terrain_detail] = &self.scales;
+
         NoiseScales {
-            height: self.height_scale,
-            moisture: self.moisture_scale,
-            flora_density: self.flora_density_scale,
-            flora_type: self.flora_type_scale,
-            terrain_detail: self.terrain_detail_scale,
+            height: height.value,
+            moisture: moisture.value,
+            flora_density: flora_density.value,
+            flora_type: flora_type.value,
+            terrain_detail: terrain_detail.value,
         }
     }
 
-    fn normalize_scale_inputs(&mut self) {
-        normalize_scale_input(
-            &mut self.height_scale,
-            &mut self.height_scale_input,
-            0.005,
-            0.150,
-        );
-        normalize_scale_input(
-            &mut self.moisture_scale,
-            &mut self.moisture_scale_input,
-            0.005,
-            0.150,
-        );
-        normalize_scale_input(
-            &mut self.flora_density_scale,
-            &mut self.flora_density_scale_input,
-            0.005,
-            0.200,
-        );
-        normalize_scale_input(
-            &mut self.flora_type_scale,
-            &mut self.flora_type_scale_input,
-            0.005,
-            0.250,
-        );
-        normalize_scale_input(
-            &mut self.terrain_detail_scale,
-            &mut self.terrain_detail_scale_input,
-            0.005,
-            0.250,
-        );
+    pub fn update_focus(&mut self) {
+        if is_mouse_button_pressed(MouseButton::Left) {
+            self.focused = mouse_is_over_sidebar();
+        }
+        if is_key_pressed(KeyCode::Tab) {
+            self.focused = true;
+        }
+        if is_key_pressed(KeyCode::Escape) {
+            self.focused = false;
+            root_ui().clear_input_focus();
+        }
+    }
+}
+
+struct ScaleInput {
+    label: &'static str,
+    value: f32,
+    input: String,
+    range: RangeInclusive<f32>,
+}
+
+impl ScaleInput {
+    fn new(label: &'static str, value: f32, range: RangeInclusive<f32>) -> Self {
+        Self {
+            label,
+            value,
+            input: format!("{value:.3}"),
+            range,
+        }
+    }
+
+    fn normalize(&mut self) {
+        let value = self
+            .input
+            .parse::<f32>()
+            .ok()
+            .filter(|value| value.is_finite())
+            .unwrap_or(self.value);
+
+        self.set_value(value);
+    }
+
+    fn set_value(&mut self, value: f32) {
+        let clamped = value.clamp(*self.range.start(), *self.range.end());
+        self.value = (clamped * 1000.0).round() / 1000.0;
+        self.input = format!("{:.3}", self.value);
+    }
+
+    fn adjust(&mut self, delta: f32) {
+        self.normalize();
+        self.set_value(self.value + delta);
     }
 }
 
@@ -101,30 +111,30 @@ fn controls_skin() -> Skin {
     let label_style = root_ui()
         .style_builder()
         .font_size(16)
-        .text_color(Color::from_rgba(224, 229, 231, 255))
+        .text_color(Color::from_hex(0xe0e5e7))
         .build();
 
     let button_style = root_ui()
         .style_builder()
         .font_size(16)
-        .text_color(Color::from_rgba(238, 242, 243, 255))
+        .text_color(Color::from_hex(0xeef2f3))
         .text_color_hovered(WHITE)
         .text_color_clicked(WHITE)
-        .color(Color::from_rgba(38, 49, 54, 255))
-        .color_hovered(Color::from_rgba(55, 82, 87, 255))
-        .color_clicked(Color::from_rgba(42, 65, 69, 255))
-        .color_selected(Color::from_rgba(54, 126, 134, 255))
-        .color_selected_hovered(Color::from_rgba(63, 145, 154, 255))
+        .color(Color::from_hex(0x263136))
+        .color_hovered(Color::from_hex(0x375257))
+        .color_clicked(Color::from_hex(0x2a4145))
+        .color_selected(Color::from_hex(0x367e86))
+        .color_selected_hovered(Color::from_hex(0x3f919a))
         .build();
 
     let editbox_style = root_ui()
         .style_builder()
         .font_size(16)
-        .text_color(Color::from_rgba(238, 242, 243, 255))
-        .color(Color::from_rgba(13, 18, 21, 255))
-        .color_hovered(Color::from_rgba(17, 24, 28, 255))
-        .color_clicked(Color::from_rgba(17, 24, 28, 255))
-        .color_selected(Color::from_rgba(54, 92, 97, 255))
+        .text_color(Color::from_hex(0xeef2f3))
+        .color(Color::from_hex(0x0d1215))
+        .color_hovered(Color::from_hex(0x11181c))
+        .color_clicked(Color::from_hex(0x11181c))
+        .color_selected(Color::from_hex(0x365c61))
         .build();
 
     Skin {
@@ -140,50 +150,10 @@ fn is_scale_input_character(character: char) -> bool {
     character.is_ascii_digit() || character == '.'
 }
 
-fn update_scale_from_input(value: &mut f32, input: &str, min: f32, max: f32) {
-    if let Ok(parsed) = input.parse::<f32>()
-        && parsed.is_finite()
-        && (min..=max).contains(&parsed)
-    {
-        *value = parsed;
-    }
-}
-
-fn normalize_scale_input(value: &mut f32, input: &mut String, min: f32, max: f32) {
-    let parsed = input
-        .parse::<f32>()
-        .ok()
-        .filter(|parsed| parsed.is_finite())
-        .unwrap_or(*value)
-        .clamp(min, max);
-
-    *input = format!("{parsed:.3}");
-    *value = input.parse().expect("formatted scale should be valid");
-}
-
-fn adjust_scale(value: &mut f32, input: &mut String, min: f32, max: f32, delta: f32) {
-    normalize_scale_input(value, input, min, max);
-
-    let adjusted = (*value + delta).clamp(min, max);
-    *input = format!("{adjusted:.3}");
-    *value = input.parse().expect("formatted scale should be valid");
-}
-
-fn draw_scale_input(
-    ui: &mut Ui,
-    id: Id,
-    label: &str,
-    position: Vec2,
-    value: &mut f32,
-    input: &mut String,
-    range: std::ops::RangeInclusive<f32>,
-) {
-    let min = *range.start();
-    let max = *range.end();
-
-    let row_background = Color::from_rgba(20, 27, 31, 255);
-    let row_border = Color::from_rgba(43, 55, 61, 255);
-    let label_color = Color::from_rgba(205, 212, 215, 255);
+fn draw_scale_input(ui: &mut Ui, scale: &mut ScaleInput, position: Vec2) {
+    let row_background = Color::from_hex(0x141b1f);
+    let row_border = Color::from_hex(0x2b373d);
+    let label_color = Color::from_hex(0xcdd4d7);
 
     draw_rectangle(
         position.x,
@@ -201,7 +171,7 @@ fn draw_scale_input(
         row_border,
     );
     draw_text(
-        label,
+        scale.label,
         position.x + 10.0,
         position.y + 24.0,
         15.0,
@@ -209,14 +179,14 @@ fn draw_scale_input(
     );
 
     let edited = widgets::Editbox::new(
-        hash!(id, "input"),
-        vec2(SCALE_INPUT_WIDTH, SCALE_ROW_HEIGHT - 8.0),
+        hash!("scale", scale.label),
+        vec2(88.0, SCALE_ROW_HEIGHT - 8.0),
     )
-    .position(position + vec2(SCALE_INPUT_X, 4.0))
+    .position(position + vec2(112.0, 4.0))
     .margin(vec2(8.0, 7.0))
     .multiline(false)
     .filter(&is_scale_input_character)
-    .ui(ui, input);
+    .ui(ui, &mut scale.input);
 
     let increase = widgets::Button::new("+")
         .position(position + vec2(SCALE_BUTTON_X, 3.0))
@@ -228,18 +198,27 @@ fn draw_scale_input(
         .size(vec2(SCALE_BUTTON_WIDTH, SCALE_BUTTON_HEIGHT))
         .ui(ui);
 
-    if edited {
-        update_scale_from_input(value, input, min, max);
+    if edited
+        && let Ok(parsed) = scale.input.parse::<f32>()
+        && parsed.is_finite()
+        && scale.range.contains(&parsed)
+    {
+        scale.value = parsed;
     }
 
     if increase {
-        adjust_scale(value, input, min, max, SCALE_STEP);
+        scale.adjust(SCALE_STEP);
     } else if decrease {
-        adjust_scale(value, input, min, max, -SCALE_STEP);
+        scale.adjust(-SCALE_STEP);
     }
 }
 
-pub(crate) fn draw_controls(controls: &mut MapControls) -> bool {
+pub fn draw_controls(controls: &mut MapControls, hovered: Option<(usize, usize, &Tile)>) -> bool {
+    draw_sidebar();
+    if let Some((x, y, tile)) = hovered {
+        draw_tile_inspector(x, y, tile);
+    }
+
     let panel_x = screen_width() - SIDEBAR_WIDTH;
     let origin = vec2(panel_x + SIDE_PADDING, HEADER_HEIGHT + 18.0);
     let seed_position = origin + vec2(0.0, 56.0);
@@ -247,17 +226,15 @@ pub(crate) fn draw_controls(controls: &mut MapControls) -> bool {
     let regenerate_position =
         first_scale_position + vec2(0.0, 5.0 * (SCALE_ROW_HEIGHT + SCALE_ROW_GAP) + 12.0);
 
-    let mut regenerate = false;
-
-    let section_color = Color::from_rgba(137, 150, 157, 255);
-    let border = Color::from_rgba(43, 55, 61, 255);
+    let section_color = Color::from_hex(0x89969d);
+    let border = Color::from_hex(0x2b373d);
 
     draw_text(
         "WORLD GENERATION",
         origin.x,
         origin.y + 17.0,
         17.0,
-        Color::from_rgba(238, 242, 243, 255),
+        Color::from_hex(0xeef2f3),
     );
     draw_line(
         origin.x,
@@ -285,86 +262,60 @@ pub(crate) fn draw_controls(controls: &mut MapControls) -> bool {
         .multiline(false)
         .ui(&mut ui, &mut controls.seed);
 
-    draw_scale_input(
-        &mut ui,
-        hash!("height_scale"),
-        "Height",
-        first_scale_position,
-        &mut controls.height_scale,
-        &mut controls.height_scale_input,
-        0.005..=0.150,
-    );
+    for (index, scale) in controls.scales.iter_mut().enumerate() {
+        let position =
+            first_scale_position + vec2(0.0, index as f32 * (SCALE_ROW_HEIGHT + SCALE_ROW_GAP));
+        draw_scale_input(&mut ui, scale, position);
+    }
 
-    draw_scale_input(
-        &mut ui,
-        hash!("moisture_scale"),
-        "Moisture",
-        first_scale_position + vec2(0.0, SCALE_ROW_HEIGHT + SCALE_ROW_GAP),
-        &mut controls.moisture_scale,
-        &mut controls.moisture_scale_input,
-        0.005..=0.150,
-    );
-
-    draw_scale_input(
-        &mut ui,
-        hash!("flora_density_scale"),
-        "Flora density",
-        first_scale_position + vec2(0.0, 2.0 * (SCALE_ROW_HEIGHT + SCALE_ROW_GAP)),
-        &mut controls.flora_density_scale,
-        &mut controls.flora_density_scale_input,
-        0.005..=0.200,
-    );
-
-    draw_scale_input(
-        &mut ui,
-        hash!("flora_type_scale"),
-        "Flora type",
-        first_scale_position + vec2(0.0, 3.0 * (SCALE_ROW_HEIGHT + SCALE_ROW_GAP)),
-        &mut controls.flora_type_scale,
-        &mut controls.flora_type_scale_input,
-        0.005..=0.250,
-    );
-
-    draw_scale_input(
-        &mut ui,
-        hash!("terrain_detail_scale"),
-        "Terrain detail",
-        first_scale_position + vec2(0.0, 4.0 * (SCALE_ROW_HEIGHT + SCALE_ROW_GAP)),
-        &mut controls.terrain_detail_scale,
-        &mut controls.terrain_detail_scale_input,
-        0.005..=0.250,
-    );
-
-    if widgets::Button::new("REGENERATE MAP")
+    let regenerate = widgets::Button::new("REGENERATE MAP")
         .position(regenerate_position)
         .size(vec2(SCALE_ROW_WIDTH, 40.0))
         .selected(true)
         .ui(&mut ui)
-    {
-        controls.normalize_scale_inputs();
-        regenerate = true;
+        || (controls.focused && is_key_pressed(KeyCode::Enter));
+
+    if regenerate {
+        for scale in &mut controls.scales {
+            scale.normalize();
+        }
+        controls.focused = false;
+        ui.clear_input_focus();
     }
 
     ui.pop_skin();
 
+    let help_y = regenerate_position.y + 62.0;
+    for (index, line) in [
+        "Enter to apply changes",
+        "",
+        "WASD / Arrows   Move",
+        "Mouse wheel     Zoom",
+        "Home            Reset view",
+        "Esc             Leave input",
+    ]
+    .iter()
+    .enumerate()
+    {
+        draw_text(
+            line,
+            origin.x,
+            help_y + index as f32 * 18.0,
+            14.0,
+            section_color,
+        );
+    }
+
     regenerate
 }
 
-pub(crate) fn mouse_is_over_sidebar() -> bool {
+pub fn mouse_is_over_sidebar() -> bool {
     let (mouse_x, _) = mouse_position();
     mouse_x >= screen_width() - SIDEBAR_WIDTH
 }
 
-pub(crate) fn draw_hud(hovered_tile: Option<(usize, usize, &Tile)>) {
-    draw_sidebar();
-
-    if let Some((x, y, tile)) = hovered_tile {
-        draw_tile_inspector(x, y, tile);
-    }
-}
-
 fn draw_sidebar() {
-    let background = Color::new(0.04, 0.05, 0.06, 0.96);
+    let background = Color::new(0.04, 0.05, 0.06, 1.0);
     let primary_text = Color::new(0.95, 0.96, 0.97, 1.0);
     let secondary_text = Color::new(0.68, 0.72, 0.76, 1.0);
     let border = Color::new(1.0, 1.0, 1.0, 0.10);
@@ -398,47 +349,47 @@ fn draw_sidebar() {
 
 fn draw_tile_inspector(x: usize, y: usize, tile: &Tile) {
     let panel_x = 12.0;
-    let panel_y = 56.0;
+    let panel_y = 12.0;
 
     let background = Color::new(0.04, 0.05, 0.06, 0.90);
     let border = Color::new(1.0, 1.0, 1.0, 0.12);
     let primary_text = Color::new(0.95, 0.96, 0.97, 1.0);
     let secondary_text = Color::new(0.72, 0.75, 0.78, 1.0);
 
-    draw_rectangle(
-        panel_x,
-        panel_y,
-        INSPECTOR_WIDTH,
-        INSPECTOR_HEIGHT,
-        background,
-    );
+    draw_rectangle(panel_x, panel_y, 220.0, 145.0, background);
 
-    draw_rectangle_lines(
-        panel_x,
-        panel_y,
-        INSPECTOR_WIDTH,
-        INSPECTOR_HEIGHT,
-        1.0,
-        border,
-    );
+    draw_rectangle_lines(panel_x, panel_y, 220.0, 145.0, 1.0, border);
 
     draw_text("TILE", panel_x + 12.0, panel_y + 22.0, 18.0, primary_text);
 
+    let biome_text = match tile.biome {
+        Biome::DeepWater => "Deep water",
+        Biome::ShallowWater => "Shallow water",
+        Biome::Land => "Land",
+        Biome::Mountain => "Mountain",
+    };
     let terrain_text = match tile.terrain {
-        Some(terrain) => format!("{:?}", terrain),
-        None => "None".to_string(),
+        Some(Terrain::Sand) => "Sand",
+        Some(Terrain::Soil) => "Soil",
+        Some(Terrain::Grassy) => "Grass",
+        Some(Terrain::Rock) => "Rock",
+        Some(Terrain::Snow) => "Snow",
+        None => "None",
     };
 
     let flora_text = match tile.flora {
-        Some(flora) => format!("{:?}", flora),
-        None => "None".to_string(),
+        Some(Flora::Flower) => "Flower",
+        Some(Flora::Bush) => "Bush",
+        Some(Flora::ShortTree) => "Short tree",
+        Some(Flora::TallTree) => "Tall tree",
+        None => "None",
     };
 
     let lines = [
         format!("Position   {}, {}", x, y),
         format!("Height     {:.3}", tile.height),
         format!("Moisture   {:.3}", tile.moisture),
-        format!("Biome      {:?}", tile.biome),
+        format!("Biome      {}", biome_text),
         format!("Terrain    {}", terrain_text),
         format!("Flora      {}", flora_text),
     ];
@@ -451,5 +402,48 @@ fn draw_tile_inspector(x: usize, y: usize, tile: &Tile) {
             15.0,
             secondary_text,
         );
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn scale_input_limits() {
+        for (input, expected) in [
+            ("", "0.021"),
+            ("..", "0.021"),
+            ("NaN", "0.021"),
+            ("inf", "0.021"),
+            ("0", "0.005"),
+            ("9", "0.150"),
+            ("0.0256", "0.026"),
+        ] {
+            let mut scale = ScaleInput::new("Height", 0.021, 0.005..=0.150);
+            scale.input = input.to_string();
+            scale.normalize();
+
+            assert_eq!(scale.input, expected, "input: {input}");
+            assert_eq!(scale.value, expected.parse::<f32>().unwrap());
+        }
+    }
+
+    #[test]
+    fn scale_button_steps() {
+        let mut scale = ScaleInput::new("Height", 0.021, 0.005..=0.150);
+        scale.input = "0.040".to_string();
+        scale.adjust(SCALE_STEP);
+        assert_eq!(scale.input, "0.041");
+
+        for _ in 0..200 {
+            scale.adjust(SCALE_STEP);
+        }
+        assert_eq!(scale.input, "0.150");
+
+        for _ in 0..200 {
+            scale.adjust(-SCALE_STEP);
+        }
+        assert_eq!(scale.input, "0.005");
     }
 }

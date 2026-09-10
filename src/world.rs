@@ -1,5 +1,5 @@
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum Biome {
+pub enum Biome {
     DeepWater,
     ShallowWater,
     Land,
@@ -7,7 +7,7 @@ pub(crate) enum Biome {
 }
 
 #[derive(Clone, Copy, Debug)]
-pub(crate) enum Terrain {
+pub enum Terrain {
     Sand,
     Soil,
     Grassy,
@@ -16,7 +16,7 @@ pub(crate) enum Terrain {
 }
 
 #[derive(Clone, Copy, Debug)]
-pub(crate) enum Flora {
+pub enum Flora {
     Flower,
     Bush,
     ShortTree,
@@ -24,22 +24,22 @@ pub(crate) enum Flora {
 }
 
 #[derive(Clone, Copy, Debug)]
-pub(crate) struct Tile {
-    pub(crate) height: f32,
-    pub(crate) moisture: f32,
-    pub(crate) biome: Biome,
-    pub(crate) terrain: Option<Terrain>,
-    pub(crate) flora: Option<Flora>,
+pub struct Tile {
+    pub height: f32,
+    pub moisture: f32,
+    pub biome: Biome,
+    pub terrain: Option<Terrain>,
+    pub flora: Option<Flora>,
 }
 
-pub(crate) struct World {
-    pub(crate) width: usize,
-    pub(crate) height: usize,
+pub struct World {
+    pub width: usize,
+    pub height: usize,
     tiles: Vec<Tile>,
 }
 
 impl World {
-    pub(crate) fn from_tiles(width: usize, height: usize, tiles: Vec<Tile>) -> Self {
+    pub fn from_tiles(width: usize, height: usize, tiles: Vec<Tile>) -> Self {
         assert_eq!(
             tiles.len(),
             width * height,
@@ -53,15 +53,8 @@ impl World {
         }
     }
 
-    pub(crate) fn get_world_tile(&self, x: usize, y: usize) -> &Tile {
-        let index = self.index(x, y);
-        &self.tiles[index]
-    }
-
-    fn index(&self, x: usize, y: usize) -> usize {
-        debug_assert!(x < self.width);
-        debug_assert!(y < self.height);
-
-        y * self.width + x
+    pub fn tile(&self, x: usize, y: usize) -> &Tile {
+        debug_assert!(x < self.width && y < self.height);
+        &self.tiles[y * self.width + x]
     }
 }

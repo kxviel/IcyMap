@@ -1,33 +1,35 @@
 use noise::{NoiseFn, Perlin};
 
-pub(crate) struct WorldNoise {
-    pub(crate) height: Perlin,
-    pub(crate) moisture: Perlin,
-    pub(crate) flora_density: Perlin,
-    pub(crate) flora_type: Perlin,
-    pub(crate) terrain_detail: Perlin,
+pub struct WorldNoise {
+    pub height: Perlin,
+    pub moisture: Perlin,
+    pub flora_density: Perlin,
+    pub flora_type: Perlin,
+    pub terrain_detail: Perlin,
 }
 
-pub(crate) struct NoiseScales {
-    pub(crate) height: f32,
-    pub(crate) moisture: f32,
-    pub(crate) flora_density: f32,
-    pub(crate) flora_type: f32,
-    pub(crate) terrain_detail: f32,
+pub struct NoiseScales {
+    pub height: f32,
+    pub moisture: f32,
+    pub flora_density: f32,
+    pub flora_type: f32,
+    pub terrain_detail: f32,
 }
 
-pub(crate) fn fbm_gen(
-    noise: &Perlin,
-    x: usize,
-    y: usize,
-    base_scale: f64,
-    octaves: usize,
-    persistence: f64,
-    lacunarity: f64,
-) -> f32 {
+impl Default for NoiseScales {
+    fn default() -> Self {
+        Self {
+            height: 0.021,
+            moisture: 0.014,
+            flora_density: 0.063,
+            flora_type: 0.140,
+            terrain_detail: 0.140,
+        }
+    }
+}
+
+pub fn fbm(noise: &Perlin, x: usize, y: usize, scale: f32, octaves: usize) -> f32 {
     debug_assert!(octaves > 0);
-    debug_assert!(persistence > 0.0);
-    debug_assert!(lacunarity > 0.0);
 
     let mut total = 0.0;
     let mut amplitude = 1.0;
@@ -35,15 +37,14 @@ pub(crate) fn fbm_gen(
     let mut max_value = 0.0;
 
     for _ in 0..octaves {
-        let noise_x = x as f64 * base_scale * frequency;
-
-        let noise_y = y as f64 * base_scale * frequency;
+        let noise_x = x as f64 * scale as f64 * frequency;
+        let noise_y = y as f64 * scale as f64 * frequency;
 
         total += noise.get([noise_x, noise_y]) * amplitude;
         max_value += amplitude;
 
-        amplitude *= persistence;
-        frequency *= lacunarity;
+        amplitude *= 0.5;
+        frequency *= 2.0;
     }
 
     let normalized = (total / max_value + 1.0) / 2.0;
@@ -63,7 +64,7 @@ fn seed_to_u32(seed: &str, salt: u32) -> u32 {
 }
 
 impl WorldNoise {
-    pub(crate) fn new(seed: &str) -> Self {
+    pub fn new(seed: &str) -> Self {
         Self {
             height: Perlin::new(seed_to_u32(seed, 100)),
             moisture: Perlin::new(seed_to_u32(seed, 200)),

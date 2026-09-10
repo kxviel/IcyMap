@@ -1,66 +1,47 @@
 use crate::{
-    noise::{NoiseScales, WorldNoise, fbm_gen},
+    noise::{NoiseScales, WorldNoise, fbm},
     world::{Biome, Flora, Terrain, Tile, World},
 };
 
-pub(crate) const DEEP_WATER_MAX_HEIGHT: f32 = 0.18;
-pub(crate) const SHALLOW_WATER_MAX_HEIGHT: f32 = 0.34;
+pub const DEEP_WATER_MAX_HEIGHT: f32 = 0.18;
+pub const SHALLOW_WATER_MAX_HEIGHT: f32 = 0.34;
 
-pub(crate) const ROCK_BASE_HEIGHT: f32 = 0.58;
-pub(crate) const ROCK_DETAIL_RANGE: f32 = 0.08;
-pub(crate) const MOUNTAIN_MIN_HEIGHT: f32 = 0.58;
-pub(crate) const SNOW_BASE_HEIGHT: f32 = 0.62;
+pub const ROCK_BASE_HEIGHT: f32 = 0.58;
+pub const ROCK_DETAIL_RANGE: f32 = 0.08;
+pub const MOUNTAIN_MIN_HEIGHT: f32 = 0.58;
+pub const SNOW_BASE_HEIGHT: f32 = 0.62;
 
-pub(crate) const SOIL_BASE_HEIGHT: f32 = 0.40;
-pub(crate) const SOIL_DETAIL_RANGE: f32 = 0.06;
+pub const SOIL_BASE_HEIGHT: f32 = 0.40;
+pub const SOIL_DETAIL_RANGE: f32 = 0.06;
 
 struct FloraSample {
     density: f32,
     kind: f32,
 }
 
-// Main API
-
-pub(crate) fn generate_world(
-    width: usize,
-    height: usize,
-    seed: &str,
-    scales: &NoiseScales,
-) -> World {
+pub fn generate_world(width: usize, height: usize, seed: &str, scales: &NoiseScales) -> World {
     let noise = WorldNoise::new(seed);
 
-    let (mut tiles, flora_samples) = generate_base_tiles(width, height, &noise, scales);
-
-    apply_beaches(&mut tiles, width, height);
-    apply_flora(&mut tiles, &flora_samples);
-
-    World::from_tiles(width, height, tiles)
-}
-
-// Phase 1: Base Terrain Generation
-
-fn generate_base_tiles(
-    width: usize,
-    height: usize,
-    noise: &WorldNoise,
-    scales: &NoiseScales,
-) -> (Vec<Tile>, Vec<FloraSample>) {
     let mut tiles = Vec::with_capacity(width * height);
     let mut flora_samples = Vec::with_capacity(width * height);
 
     for y in 0..height {
         for x in 0..width {
-            let (tile, flora_sample) = generate_base_tile(x, y, width, height, noise, scales);
+            let (tile, flora_sample) = sample_tile(x, y, width, height, &noise, scales);
 
             tiles.push(tile);
             flora_samples.push(flora_sample);
         }
     }
 
-    (tiles, flora_samples)
+    apply_beaches(&mut tiles, width, height);
+    for (tile, sample) in tiles.iter_mut().zip(flora_samples) {
+        tile.flora = generate_flora(tile.terrain, tile.moisture, sample.density, sample.kind);
+    }
+    World::from_tiles(width, height, tiles)
 }
 
-fn generate_base_tile(
+fn sample_tile(
     x: usize,
     y: usize,
     width: usize,
@@ -68,35 +49,11 @@ fn generate_base_tile(
     noise: &WorldNoise,
     scales: &NoiseScales,
 ) -> (Tile, FloraSample) {
-    let raw_height = fbm_gen(&noise.height, x, y, scales.height as f64, 5, 0.5, 2.0);
-    let moisture = fbm_gen(&noise.moisture, x, y, scales.moisture as f64, 3, 0.5, 2.0);
-    let flora_density = fbm_gen(
-        &noise.flora_density,
-        x,
-        y,
-        scales.flora_density as f64,
-        3,
-        0.5,
-        2.0,
-    );
-    let flora_type = fbm_gen(
-        &noise.flora_type,
-        x,
-        y,
-        scales.flora_type as f64,
-        1,
-        0.5,
-        2.0,
-    );
-    let terrain_detail = fbm_gen(
-        &noise.terrain_detail,
-        x,
-        y,
-        scales.terrain_detail as f64,
-        2,
-        0.5,
-        2.0,
-    );
+    let raw_height = fbm(&noise.height, x, y, scales.height, 5);
+    let moisture = fbm(&noise.moisture, x, y, scales.moisture, 3);
+    let flora_density = fbm(&noise.flora_density, x, y, scales.flora_density, 3);
+    let flora_type = fbm(&noise.flora_type, x, y, scales.flora_type, 1);
+    let terrain_detail = fbm(&noise.terrain_detail, x, y, scales.terrain_detail, 2);
     let shaped_height = apply_island_shape(raw_height, x, y, width, height);
     let biome = choose_biome(shaped_height);
     let terrain = generate_terrain(biome, shaped_height, moisture, terrain_detail);
@@ -159,18 +116,13 @@ fn generate_terrain(biome: Biome, height: f32, moisture: f32, detail: f32) -> Op
     }
 }
 
-// Phase 2: Beach Application
-
 fn apply_beaches(tiles: &mut [Tile], width: usize, height: usize) {
     for y in 0..height {
         for x in 0..width {
             let index = y * width + x;
 
             let can_be_beach = tiles[index].biome == Biome::Land
-                && matches!(
-                    tiles[index].terrain,
-                    Some(Terrain::Grassy) | Some(Terrain::Soil)
-                );
+                && matches!(tiles[index].terrain, Some(Terrain::Grassy | Terrain::Soil));
 
             if !can_be_beach {
                 continue;
@@ -190,42 +142,15 @@ fn has_shallow_water_neighbor(
     width: usize,
     height: usize,
 ) -> bool {
-    for offset_y in -1..=1 {
-        for offset_x in -1..=1 {
-            if offset_x == 0 && offset_y == 0 {
-                continue;
-            }
-
-            let neighbor_x = x as isize + offset_x;
-            let neighbor_y = y as isize + offset_y;
-
-            if neighbor_x < 0
-                || neighbor_y < 0
-                || neighbor_x >= width as isize
-                || neighbor_y >= height as isize
-            {
-                continue;
-            }
-
-            let neighbor_index = neighbor_y as usize * width + neighbor_x as usize;
-
-            if tiles[neighbor_index].biome == Biome::ShallowWater {
+    for ny in y.saturating_sub(1)..=(y + 1).min(height - 1) {
+        for nx in x.saturating_sub(1)..=(x + 1).min(width - 1) {
+            if (nx != x || ny != y) && tiles[ny * width + nx].biome == Biome::ShallowWater {
                 return true;
             }
         }
     }
 
     false
-}
-
-// Phase 3: Flora Application
-
-fn apply_flora(tiles: &mut [Tile], flora_samples: &[FloraSample]) {
-    debug_assert_eq!(tiles.len(), flora_samples.len());
-
-    for (tile, sample) in tiles.iter_mut().zip(flora_samples.iter()) {
-        tile.flora = generate_flora(tile.terrain, tile.moisture, sample.density, sample.kind);
-    }
 }
 
 fn generate_flora(
@@ -278,8 +203,6 @@ fn generate_flora(
         Some(Terrain::Sand) | Some(Terrain::Rock) | Some(Terrain::Snow) | None => None,
     }
 }
-
-// Math & Utility Helpers
 
 fn apply_island_shape(height_value: f32, x: usize, y: usize, width: usize, height: usize) -> f32 {
     let distance_x = normalize_axis(x, width);
